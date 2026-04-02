@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>單字測驗系統</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>單字測驗</h1>
+        
+        <div id="setup-section">
+            <div class="form-group">
+                <label>出題形式：</label>
+                <select id="qType">
+                    <option value="" disabled selected>請選擇出題方式</option>
+                    <option value="audio">聽力</option>
+                    <option value="中文意思">看中文</option>
+                    <option value="漢字">看漢字</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>答題形式：</label>
+                <select id="aType">
+                    <option value="" disabled selected>請選擇答題方式</option>
+                    <option value="flip">翻卡</option>
+                    <option value="假名拼音">輸入假名/拼音</option>
+                    <option value="中文意思">輸入中文</option>
+                    <option value="漢字">輸入漢字</option>
+                </select>
+            </div>
+            <button id="start-btn">開始測驗</button>
+        </div>
+
+        <div id="quiz-section" class="hidden">
+            <button id="home-btn" class="secondary-btn">🏠 重新設定 (回首頁)</button>
+            
+            <div id="question-display"></div>
+            <button id="play-audio-btn" class="hidden">🔊 重播音效</button>
+
+            <div id="input-area" class="hidden">
+                <input type="text" id="answer-input" placeholder="請輸入答案" autocomplete="off">
+                <button id="submit-btn">送出</button>
+            </div>
+
+            <div id="flashcard-area" class="hidden">
+                <div class="flashcard" id="flashcard">
+                    <div class="flashcard-inner">
+                        <div class="flashcard-front">點擊翻看答案</div>
+                        <div class="flashcard-back" id="flashcard-answer"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="feedback"></div>
+            <button id="next-btn" class="hidden">下一題</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

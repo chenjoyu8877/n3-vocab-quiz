@@ -1,0 +1,121 @@
+body {
+    font-family: "Microsoft JhengHei", sans-serif;
+    background-color: #f4f4f9;
+    display: flex;
+    justify-content: center;
+    padding-top: 50px;
+}
+
+.container {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    width: 400px;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+select, input[type="text"], button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 5px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+}
+
+button {
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+    margin-top: 15px;
+}
+
+button:hover { background-color: #0056b3; }
+
+/* 副按鈕 (回首頁) 樣式 */
+.secondary-btn {
+    background-color: #6c757d;
+    margin-bottom: 20px;
+    width: auto;
+    padding: 8px 15px;
+    font-size: 14px;
+}
+
+.secondary-btn:hover { 
+    background-color: #5a6268; 
+}
+
+.hidden { display: none !important; }
+
+#question-display {
+    font-size: 24px;
+    font-weight: bold;
+    margin: 20px 0;
+}
+
+/* 翻卡效果 CSS (已修復排版重疊問題) */
+.flashcard {
+    background-color: transparent;
+    width: 100%;
+    height: 350px; /* 【關鍵1】給定固定高度，卡片大小固定 */
+    perspective: 1000px;
+    cursor: pointer;
+    margin-top: 20px;
+}
+
+.flashcard-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform 0.6s;
+    transform-style: preserve-3d;
+}
+
+.flashcard.is-flipped .flashcard-inner {
+    transform: rotateY(180deg);
+}
+
+.flashcard-front, .flashcard-back {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    display: flex;
+    font-size: 20px;
+    border-radius: 10px;
+    box-sizing: border-box;
+}
+
+.flashcard-front {
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #007bff;
+    background-color: #f8f9fa;
+}
+
+.flashcard-back {
+    transform: rotateY(180deg);
+    background-color: #e9ecef;
+    color: #333;
+    border: 2px solid #28a745;
+    flex-direction: column;
+    padding: 25px 20px;
+    justify-content: flex-start; /* 【關鍵2】從上方開始排，就不會往上蓋住按鈕 */
+    align-items: center;
+    overflow-y: auto; /* 【關鍵3】內容如果超過 350px，允許在卡片內上下捲動 */
+}
+
+#feedback {
+    margin-top: 15px;
+    font-weight: bold;
+    font-size: 18px;
+}

@@ -20,6 +20,12 @@ const globalAudioPlayer = new Audio();
 let vocabData = [];
 let currentWord = {};
 
+// 輔助功能：清理括號內的中文
+function cleanForSpeech(text) {
+    if (!text) return "";
+    return text.replace(/[\(\（].*?[\)\）]/g, '').trim();
+}
+
 // 1. 處理下拉選單互斥防呆
 qType.addEventListener('change', () => {
     Array.from(aType.options).forEach(opt => opt.disabled = false);
@@ -74,7 +80,6 @@ function nextQuestion() {
     const randomIndex = Math.floor(Math.random() * vocabData.length);
     currentWord = vocabData[randomIndex];
 
-    // 準備背面的 HTML
     const fullAnswerHTML = `
         <div style="font-size: 22px; margin-bottom: 5px;">
             <strong>${currentWord['漢字'] || ''}</strong> (${currentWord['假名拼音'] || ''})
@@ -84,8 +89,10 @@ function nextQuestion() {
             [${currentWord['詞性'] || '-'}] | 重音：${currentWord['重音'] || '-'}
         </div>
         <div style="font-size: 14px; text-align: left; width: 100%;">
-            ${currentWord['常用例句 1'] ? `・${currentWord['常用例句 1']}<br>` : ''}
-            ${currentWord['常用例句 2'] ? `・${currentWord['常用例句 2']}` : ''}
+            ${currentWord['常用例句 1'] ? 
+                `<div class="sentence-row" style="cursor:pointer; padding:3px;" onclick="event.stopPropagation(); playTTS('1')">🔊 ${currentWord['常用例句 1']}</div>` : ''}
+            ${currentWord['常用例句 2'] ? 
+                `<div class="sentence-row" style="cursor:pointer; padding:3px;" onclick="event.stopPropagation(); playTTS('2')">🔊 ${currentWord['常用例句 2']}</div>` : ''}
         </div>
     `;
     
@@ -93,9 +100,7 @@ function nextQuestion() {
         inputArea.classList.add('hidden');
         flashcardArea.classList.remove('hidden');
         
-        // 【修正重點】判斷卡片當前狀態
         if (flashcard.classList.contains('is-flipped')) {
-            // 如果卡片在背面，才需要執行「等待翻轉動畫」的邏輯
             flashcardAnswer.innerHTML = '<div style="font-size: 16px; color: #777;">單字載入中...</div>';
             flashcard.classList.remove('is-flipped');
             
@@ -107,25 +112,23 @@ function nextQuestion() {
             };
             flashcard.addEventListener('transitionend', handleTransition);
         } else {
-            // 如果卡片已經在正面（例如第一題），直接填入內容，不用等動畫
             flashcardAnswer.innerHTML = fullAnswerHTML;
         }
 
     } else {
-        // 打字模式直接載入
         flashcard.classList.remove('is-flipped');
         flashcardAnswer.innerHTML = fullAnswerHTML;
         flashcardArea.classList.add('hidden');
         inputArea.classList.remove('hidden');
-        setTimeout(() => answerInput.focus(), 50); // 稍微延遲確保對焦成功
+        setTimeout(() => answerInput.focus(), 50); 
     }
 
-    // 處理出題內容與語音
     playAudioBtn.classList.add('hidden');
     if (qType.value === 'audio') {
         questionDisplay.innerText = "🎧 請聽發音";
         playAudioBtn.classList.remove('hidden');
-        playTTS(); 
+        // 【關鍵改動】：出題時直接啟動「連讀序列」
+        playFullSequence(); 
     } else if (qType.value === '中文意思') {
         questionDisplay.innerText = currentWord['中文意思'];
     } else if (qType.value === '漢字') {
@@ -133,29 +136,62 @@ function nextQuestion() {
     }
 }
 
-// 4. 高品質語音播放
-function playTTS() {
-    let sourceText = currentWord['漢字'] || currentWord['假名拼音'];
-    if (!sourceText) return;
+// 4-1. 高品質語音播放 (Promise 化版本，確保播完才會執行下一步)
+function playTTS(type = 'word') {
+    return new Promise((resolve) => {
+        let rawText = currentWord['漢字'] || currentWord['假名拼音'];
+        if (!rawText) return resolve();
 
-    const safeFileName = sourceText.trim().replace(/\//g, '_');
-    const audioUrl = `./audio/${encodeURIComponent(safeFileName)}.mp3`;
+        const baseFileName = rawText.trim().replace(/\//g, '_');
+        let targetFileName = type === 'word' ? baseFileName : `${baseFileName}_${type}`;
+        const audioUrl = `./audio/${encodeURIComponent(targetFileName)}.mp3`;
 
-    globalAudioPlayer.pause();
-    globalAudioPlayer.currentTime = 0; 
-    globalAudioPlayer.src = audioUrl;
+        globalAudioPlayer.pause();
+        globalAudioPlayer.currentTime = 0; 
+        globalAudioPlayer.src = audioUrl;
 
-    globalAudioPlayer.play().catch(err => {
-        console.warn("播放失敗，嘗試系統語音:", err);
-        window.speechSynthesis.cancel();
-        const backup = new SpeechSynthesisUtterance(sourceText);
-        backup.lang = 'ja-JP';
-        window.speechSynthesis.speak(backup);
+        // 當音檔播放結束時，發出完成信號
+        globalAudioPlayer.onended = () => resolve();
+
+        globalAudioPlayer.play().catch(err => {
+            console.warn("找不到預錄檔，嘗試系統語音:", err);
+            let speechText = type === 'word' ? rawText : currentWord[`常用例句 ${type}`];
+            window.speechSynthesis.cancel();
+            const backup = new SpeechSynthesisUtterance(cleanForSpeech(speechText));
+            backup.lang = 'ja-JP';
+            // 系統語音結束時也發出完成信號
+            backup.onend = () => resolve();
+            window.speechSynthesis.speak(backup);
+        });
     });
 }
 
+// 4-2. 【新增】連鎖播放邏輯：單字 -> 停頓 -> 例句 1 -> 停頓 -> 例句 2
+async function playFullSequence() {
+    // 停止目前所有可能的播放，確保乾淨開始
+    window.speechSynthesis.cancel();
+    
+    // 1. 播放單字
+    await playTTS('word');
+    
+    // 2. 停頓 0.6 秒 (可依喜好調整)
+    await new Promise(r => setTimeout(r, 600));
+
+    // 3. 播放例句 1
+    if (currentWord['常用例句 1']) {
+        await playTTS('1');
+        await new Promise(r => setTimeout(r, 600));
+    }
+
+    // 4. 播放例句 2
+    if (currentWord['常用例句 2']) {
+        await playTTS('2');
+    }
+}
+
 // 事件監聽
-playAudioBtn.addEventListener('click', playTTS);
+// 重播按鈕現在也會執行完整序列
+playAudioBtn.addEventListener('click', () => playFullSequence());
 submitBtn.addEventListener('click', checkAnswer);
 nextBtn.addEventListener('click', nextQuestion);
 

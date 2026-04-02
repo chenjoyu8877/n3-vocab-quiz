@@ -3,59 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>單字測驗系統</title>
+    <title>N3 單字高手 Pro</title>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
 </head>
 <body>
     <div class="container">
-        <h1>單字測驗</h1>
-        
         <div id="setup-section">
-            <div class="form-group">
+            <h1>N3 日文單字測驗</h1>
+            <div class="control-group">
                 <label>出題形式：</label>
                 <select id="qType">
-                    <option value="" disabled selected>請選擇出題方式</option>
-                    <option value="audio">聽力</option>
-                    <option value="中文意思">看中文</option>
-                    <option value="漢字">看漢字</option>
+                    <option value="中文意思">中文意思</option>
+                    <option value="漢字">漢字</option>
+                    <option value="audio">聽力出題 (Audio)</option>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="control-group">
                 <label>答題形式：</label>
                 <select id="aType">
-                    <option value="" disabled selected>請選擇答題方式</option>
-                    <option value="flip">翻卡</option>
-                    <option value="假名拼音">輸入假名/拼音</option>
-                    <option value="中文意思">輸入中文</option>
-                    <option value="漢字">輸入漢字</option>
+                    <option value="漢字">漢字回答</option>
+                    <option value="假名拼音">假名回答</option>
+                    <option value="flip">翻卡模式 (不打字)</option>
                 </select>
             </div>
-            <button id="start-btn">開始測驗</button>
+            <button id="start-btn" class="primary-btn">開始測驗</button>
         </div>
 
         <div id="quiz-section" class="hidden">
-            <button id="home-btn" class="secondary-btn">🏠 重新設定 (回首頁)</button>
+            <div class="header-row">
+                <button id="home-btn">⬅ 回首頁</button>
+            </div>
             
-            <div id="question-display"></div>
-            <button id="play-audio-btn" class="hidden">🔊 重播音效</button>
+            <div id="question-area">
+                <h2 id="question-display">載入中...</h2>
+                <button id="play-audio-btn" class="hidden">🔊 重播單字</button>
+            </div>
 
-            <div id="input-area" class="hidden">
-                <input type="text" id="answer-input" placeholder="請輸入答案" autocomplete="off">
-                <button id="submit-btn">送出</button>
+            <div id="input-area">
+                <input type="text" id="answer-input" placeholder="輸入答案..." autocomplete="off">
+                <button id="submit-btn">送出答案</button>
             </div>
 
             <div id="flashcard-area" class="hidden">
-                <div class="flashcard" id="flashcard">
-                    <div class="flashcard-inner">
-                        <div class="flashcard-front">點擊翻看答案</div>
-                        <div class="flashcard-back" id="flashcard-answer"></div>
-                    </div>
+                <div id="flashcard">
+                    <div class="card-face card-front">點擊查看答案</div>
+                    <div class="card-face card-back" id="flashcard-answer"></div>
                 </div>
             </div>
 
-            <div id="feedback"></div>
-            <button id="next-btn" class="hidden">下一題</button>
+            <p id="feedback"></p>
+            <button id="next-btn" class="hidden">下一題 ➔</button>
         </div>
     </div>
     <script src="script.js"></script>

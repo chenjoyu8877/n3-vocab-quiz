@@ -338,7 +338,6 @@ function startQuiz() {
         const apiKey = geminiApiKeyInput.value.trim();
         if (!apiKey) { alert("請先輸入 Gemini API Key！"); return; }
         
-        // ⭐ 將 API Key 存入瀏覽器，下次不用重填
         localStorage.setItem('geminiApiKey', apiKey); 
 
         const mode = aType.value;
@@ -357,8 +356,7 @@ function startQuiz() {
         });
 
         dueWords.sort(() => Math.random() - 0.5); 
-        // ⭐ 改成 5 題，方便快速測試
-        batchQuestions = dueWords.slice(0, 5); 
+        batchQuestions = dueWords.slice(0, 10); 
 
         if (batchQuestions.length === 0) { alert("🎉 今日任務已完成！"); return; }
     } else {
@@ -581,6 +579,7 @@ async function processBatchResults() {
     }
 }
 
+// ⭐ 更新：加入 onclick 點擊展開單字卡功能
 function renderBatchResults(aiResults) {
     feedback.innerHTML = "";
     batchResultsArea.classList.remove('hidden');
@@ -613,15 +612,19 @@ function renderBatchResults(aiResults) {
         const boxColor = finalCorrect ? '#c3e6cb' : '#f5c6cb';
         const aiTagStr = `<span style="color:${aiResult ? 'green' : 'red'}; font-weight:bold;">${aiResult ? 'AI 判定正確' : 'AI 判定錯誤'}</span>`;
 
+        // ⭐ 取得單字在總詞庫中的 Index，並加上 onclick 與 hover 動畫
+        const wordIndex = vocabData.indexOf(item.word);
+
         html += `
-            <div class="card-box" style="border: 2px solid ${boxColor}; margin-bottom: 10px; padding: 12px;">
+            <div class="card-box" onclick="showWordDetail(${wordIndex})" style="border: 2px solid ${boxColor}; margin-bottom: 10px; padding: 12px; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
                 <h4 style="margin: 0 0 8px 0; font-size: 18px;">${statusIcon} ${item.word['漢字']} (${item.word['假名拼音']})</h4>
                 <p style="margin: 3px 0; font-size: 14px; color: #555;">標準答案: ${item.word['中文意思']}</p>
                 <p style="margin: 3px 0; font-size: 14px; color: #007bff; font-weight: bold;">
                     你的輸入: ${item.userC} ${mode === 'both' ? ` (漢字: ${item.userK})` : ''}
                 </p>
-                <div style="margin-top: 5px; font-size: 13px; background: #f8f9fa; padding: 5px; border-radius: 4px;">
+                <div style="margin-top: 5px; font-size: 13px; background: #f8f9fa; padding: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
                     ${aiTagStr}
+                    <span style="color: #888; font-size: 11px;">🔍 點擊查看單字卡</span>
                 </div>
             </div>
         `;
@@ -711,7 +714,6 @@ function syncToCloud(op, wordObj) {
     fetch(PROGRESS_API_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(data) });
 }
 
-// ⭐ 網頁載入時自動讀取 localStorage 中的 API Key
 window.onload = () => {
     refreshHomeStats();
     const savedKey = localStorage.getItem('geminiApiKey');

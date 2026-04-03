@@ -3,30 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N3 單字高手 Pro</title>
+    <title>N3 單字高手 Pro - 例句填空強化版</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
+        
         <div id="setup-section">
             <h1>N3 日文單字測驗</h1>
+            
             <div class="control-group">
-                <label>出題形式：</label>
+                <label for="qType">出題形式：</label>
                 <select id="qType">
-                    <option value="中文意思">中文意思</option>
-                    <option value="漢字">漢字</option>
+                    <option value="sentence">例句填空模式</option>
                     <option value="audio">聽力出題 (Audio)</option>
+                    <option value="中文意思">中文意思出題</option>
+                    <option value="漢字">漢字出題</option>
                 </select>
             </div>
+
             <div class="control-group">
-                <label>答題形式：</label>
+                <label for="aType">答題形式：</label>
                 <select id="aType">
-                    <option value="漢字">漢字回答</option>
-                    <option value="假名拼音">假名回答</option>
-                    <option value="flip">翻卡模式 (不打字)</option>
-                </select>
+                    </select>
             </div>
+
+            <div class="advanced-settings">
+                <div class="toggle-group">
+                    <label class="switch">
+                        <input type="checkbox" id="srs-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span>開啟遺忘曲線模式 (SRS)</span>
+                </div>
+                <div class="toggle-group">
+                    <label class="switch">
+                        <input type="checkbox" id="log-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                    <span>同步學習進度至雲端</span>
+                </div>
+                
+                <div class="stats-container" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 12px; border: 1px solid #eee;">
+                    <h3 style="font-size: 16px; margin-bottom: 10px; color: #444;">📊 弱點分析 (最常錯單字)</h3>
+                    <canvas id="errorChart" width="400" height="250"></canvas>
+                </div>
+
+                <button id="reset-data-btn" class="danger-btn">🧹 重設所有單字進度 (歸零)</button>
+            </div>
+
             <button id="start-btn" class="primary-btn">開始測驗</button>
         </div>
 
@@ -36,26 +63,46 @@
             </div>
             
             <div id="question-area">
-                <h2 id="question-display">載入中...</h2>
-                <button id="play-audio-btn" class="hidden">🔊 重播單字</button>
+                <div id="question-display-container">
+                    <h2 id="question-display" style="line-height: 1.4; margin-bottom: 10px;">載入中...</h2>
+                </div>
+                
+                <div id="hint-display" style="color: #666; font-size: 15px; margin-bottom: 10px; font-weight: bold; background: #f0f0f0; padding: 5px 10px; border-radius: 5px; display: inline-block;"></div>
+                
+                <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 15px;">
+                    <button id="play-audio-btn" class="secondary-btn hidden" style="margin:0; flex: 1;">🔊 重播語音</button>
+                    <button id="give-hint-btn" class="secondary-btn" style="margin:0; flex: 1; background-color: #6c757d;">💡 提示一下</button>
+                </div>
+
+                <div id="word-hint-text" style="color: #fd7e14; font-size: 15px; margin-bottom: 15px; min-height: 20px; font-weight: bold;"></div>
             </div>
 
-            <div id="input-area">
-                <input type="text" id="answer-input" placeholder="輸入答案..." autocomplete="off">
-                <button id="submit-btn">送出答案</button>
+            <div id="input-area" class="hidden">
+                <input type="text" id="answer-input" placeholder="請在此輸入答案..." autocomplete="off">
+                <button id="submit-btn" class="primary-btn">送出答案</button>
             </div>
 
-            <div id="flashcard-area" class="hidden">
-                <div id="flashcard">
-                    <div class="card-face card-front">點擊查看答案</div>
-                    <div class="card-face card-back" id="flashcard-answer"></div>
+            <div id="canvas-area" class="hidden" style="text-align: center;">
+                <p style="font-size: 14px; color: #555; margin-bottom: 5px;">請在下方區域手寫單字：</p>
+                <canvas id="hw-canvas" width="320" height="240" style="border: 2px solid #333; background: #fff; touch-action: none; border-radius: 8px; cursor: crosshair; box-shadow: 0 4px 10px rgba(0,0,0,0.1);"></canvas>
+                <div style="margin-top: 10px;">
+                    <button onclick="clearCanvas()" class="secondary-btn" style="display: inline-block; width: auto; padding: 10px 20px;">清除畫板</button>
+                    <button id="canvas-submit-btn" class="primary-btn" style="display: inline-block; width: auto; padding: 10px 30px;" onclick="checkAnswer()">我寫好了 (查看答案卡)</button>
                 </div>
             </div>
 
-            <p id="feedback"></p>
-            <button id="next-btn" class="hidden">下一題 ➔</button>
+            <div id="flashcard-area" class="hidden">
+                <div id="flashcard" onclick="checkAnswer()" style="cursor: pointer; background: #fffbe6; border: 2px dashed #ffe58f; padding: 30px; border-radius: 15px; margin-bottom: 20px; text-align: center;">
+                    <div class="card-face" style="font-size: 18px; color: #856404; font-weight: bold;">點擊此處 / 按 Enter 查看完整單字卡</div>
+                </div>
+            </div>
+
+            <div id="feedback"></div>
+
+            <button id="next-btn" class="primary-btn hidden">下一題 ➔</button>
         </div>
     </div>
+
     <script src="script.js"></script>
 </body>
 </html>

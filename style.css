@@ -1,189 +1,300 @@
-/* 基本版面設定 */
+/* =========================================
+   1. 基本版面設定 (Global Styles)
+   ========================================= */
 body {
-    font-family: "Microsoft JhengHei", "Apple LiGothic Medium", sans-serif;
-    background-color: #f4f4f9;
+    font-family: "PingFang TC", "Microsoft JhengHei", "Segoe UI", Roboto, sans-serif;
+    background-color: #f0f4f8;
     display: flex;
     justify-content: center;
-    padding-top: 50px;
+    padding: 20px;
     margin: 0;
+    min-height: 100vh;
+    color: #333;
 }
 
 .container {
     background: white;
-    padding: 30px;
-    border-radius: 15px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-    width: 400px;
+    padding: 25px;
+    border-radius: 24px;
+    box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+    width: 95%;
+    max-width: 440px;
     text-align: center;
+    align-self: flex-start;
 }
 
 .hidden { display: none !important; }
 
-/* 標題與出題區 */
-#question-display {
-    font-size: 28px;
-    font-weight: bold;
-    margin: 20px 0;
-    color: #333;
-}
+/* =========================================
+   2. 設定區域與統計圖表 (Setup & Stats)
+   ========================================= */
+h1 { color: #007bff; margin-bottom: 25px; font-size: 24px; font-weight: 800; }
 
-/* 重播單字按鈕樣式 */
-#play-audio-btn {
-    background-color: #ff9800;
-    color: white;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 20px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: 0.3s;
-    margin-bottom: 10px;
-}
-
-#play-audio-btn:hover {
-    background-color: #e68a00;
-    transform: scale(1.05);
-}
-
-/* 下拉選單與輸入框 */
 .control-group {
-    margin-bottom: 15px;
+    margin-bottom: 18px;
     text-align: left;
+}
+
+label {
+    font-size: 14px;
+    font-weight: bold;
+    color: #555;
+    display: block;
+    margin-bottom: 6px;
 }
 
 select, input[type="text"] {
     width: 100%;
     padding: 12px;
-    margin-top: 8px;
     box-sizing: border-box;
-    border: 1px solid #ddd;
-    border-radius: 8px;
+    border: 2px solid #e1e8ed;
+    border-radius: 12px;
     font-size: 16px;
+    outline: none;
+    transition: all 0.3s ease;
+    background-color: #fff;
 }
 
-/* 按鈕系列 */
-button {
-    width: 100%;
-    padding: 12px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: 0.3s;
+select:focus, input[type="text"]:focus {
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
 }
 
-.primary-btn, #submit-btn, #next-btn {
-    background-color: #007bff;
-    color: white;
-    margin-top: 15px;
-}
-
-.primary-btn:hover, #submit-btn:hover, #next-btn:hover {
-    background-color: #0056b3;
-}
-
-#home-btn {
-    background-color: #6c757d;
-    color: white;
-    width: auto;
-    padding: 6px 12px;
-    font-size: 14px;
-    margin-bottom: 20px;
-    float: left; /* 讓回首頁按鈕靠左 */
-}
-
-#home-btn:hover { background-color: #5a6268; }
-
-/* 3D 翻卡區域設定 */
-#flashcard-area {
-    perspective: 1000px;
-    width: 100%;
-    height: 350px; /* 固定高度，防止撐開版面 */
-    margin: 20px 0;
-}
-
-#flashcard {
-    position: relative;
-    width: 100%;
-    height: 100%;
-    text-align: center;
-    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    transform-style: preserve-3d;
-    cursor: pointer;
-}
-
-/* 翻轉狀態 */
-#flashcard.is-flipped {
-    transform: rotateY(180deg);
-}
-
-.card-face {
-    position: absolute;
-    width: 100%;
-    height: 100%;
-    backface-visibility: hidden; /* 翻轉時隱藏背面 */
-    border-radius: 15px;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-}
-
-/* 卡片正面 */
-.card-front {
+.stats-container {
     background-color: #f8f9fa;
-    border: 2px dashed #007bff;
+    padding: 15px;
+    border-radius: 18px;
+    margin: 20px 0;
+    border: 1px solid #eee;
+}
+
+.advanced-settings {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    text-align: left;
+}
+
+.toggle-group {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    color: #007bff;
-    font-size: 20px;
+    margin-bottom: 15px;
+    font-size: 14px;
+    color: #444;
+}
+
+/* 開關切換器 (Switch) */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 22px;
+    margin-right: 12px;
+}
+
+.switch input { opacity: 0; width: 0; height: 0; }
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 22px;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 16px; width: 16px;
+    left: 3px; bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+input:checked + .slider { background-color: #28a745; }
+input:checked + .slider:before { transform: translateX(22px); }
+
+/* =========================================
+   3. 測驗主畫面 (Quiz Section)
+   ========================================= */
+.header-row { margin-bottom: 20px; overflow: hidden; }
+
+#question-display {
+    font-size: 28px;
+    font-weight: bold;
+    margin: 15px 0;
+    color: #2c3e50;
+    word-break: break-all;
+    min-height: 1.2em;
+}
+
+/* 狀態與重音提示 */
+#hint-display {
+    font-size: 14px;
+    color: #7f8c8d;
+    margin-bottom: 15px;
+    padding: 6px 12px;
+    background: #f1f3f5;
+    border-radius: 8px;
+    display: inline-block;
+}
+
+/* 💡 提示文字 */
+#word-hint-text {
+    color: #e67e22;
+    font-size: 15px;
+    margin-bottom: 15px;
+    min-height: 22px;
     font-weight: bold;
 }
 
-/* 卡片背面 */
-.card-back {
-    background-color: #ffffff;
-    border: 2px solid #28a745;
-    transform: rotateY(180deg);
-    padding: 20px;
-    justify-content: flex-start; /* 從頂部開始排版 */
-    align-items: center;
-    overflow-y: auto; /* 內容過長時允許滾動 */
-    color: #333;
+/* 手寫板區域 */
+#canvas-area {
+    margin: 15px 0;
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 18px;
+    border: 1px solid #e1e8ed;
 }
 
-/* 例句列樣式 */
-.sentence-row {
-    width: 100%;
+#hw-canvas {
+    background-color: white;
+    border: 2px solid #ced4da;
+    border-radius: 12px;
+    cursor: crosshair;
+    max-width: 100%;
+    box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
+    touch-action: none; /* 重要：防止畫畫時螢幕捲動 */
+}
+
+/* =========================================
+   4. 單字卡與判定回饋 (Card & Result)
+   ========================================= */
+.card-box {
+    margin-top: 20px;
+    padding: 20px;
+    border-radius: 20px;
+    background: #ffffff;
+    border: 2px solid #eef2f7;
     text-align: left;
-    background-color: #f1f3f5;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+    animation: slideUp 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 手動判定區塊 */
+#manual-controls {
+    border-bottom: 2px dashed #ffeeba;
+    padding-bottom: 15px;
+    margin-bottom: 15px;
+}
+
+.sentence-row {
+    background-color: #f8f9fa;
+    padding: 12px;
+    border-radius: 10px;
     margin-top: 10px;
-    padding: 10px;
-    border-radius: 8px;
     font-size: 14px;
-    line-height: 1.5;
     cursor: pointer;
-    transition: 0.2s;
-    border-left: 4px solid #28a745;
+    border-left: 5px solid #007bff;
+    transition: all 0.2s;
 }
 
 .sentence-row:hover {
-    background-color: #e2e6ea;
-    color: #1e7e34;
-    transform: translateX(5px);
+    background-color: #eef2f7;
+    transform: translateX(3px);
 }
 
-/* 反饋文字 */
-#feedback {
-    margin-top: 15px;
-    font-size: 18px;
-    min-height: 24px; /* 防止文字出現時版面跳動 */
+.sentence-row strong { color: #2c3e50; display: block; margin-bottom: 4px; }
+.sentence-row small { color: #6c757d; font-size: 13px; }
+
+/* =========================================
+   5. 按鈕樣式 (Buttons)
+   ========================================= */
+button {
+    font-family: inherit;
+    border: none;
+    border-radius: 14px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-/* 自定義滾動條 (讓卡片背面更美觀) */
-.card-back::-webkit-scrollbar {
-    width: 6px;
+.primary-btn, #submit-btn, #next-btn, #canvas-submit-btn {
+    width: 100%;
+    padding: 16px;
+    background-color: #007bff;
+    color: white;
+    font-size: 17px;
+    margin-top: 10px;
+    box-shadow: 0 4px 15px rgba(0,123,255,0.3);
 }
-.card-back::-webkit-scrollbar-thumb {
-    background: #ccc;
+
+.primary-btn:hover { background-color: #0056b3; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,123,255,0.4); }
+
+.secondary-btn {
+    background-color: #6c757d;
+    color: white;
+    padding: 10px 15px;
+    font-size: 14px;
+}
+
+#play-audio-btn { background-color: #fd7e14; box-shadow: 0 4px 12px rgba(253,126,20,0.2); }
+#play-audio-btn:hover { background-color: #e67e22; }
+
+#give-hint-btn { background-color: #adb5bd; color: white; }
+
+#home-btn {
+    background-color: transparent;
+    color: #6c757d;
+    border: 1.5px solid #dee2e6;
+    padding: 8px 16px;
+    font-size: 13px;
+    float: left;
     border-radius: 10px;
 }
+
+.danger-btn {
+    background-color: #fff1f0;
+    color: #f5222d;
+    border: 1px solid #ffa39e;
+    width: 100%;
+    font-size: 13px;
+    padding: 10px;
+    margin-top: 12px;
+}
+
+#undo-btn {
+    background-color: #e7f3ff;
+    color: #007bff;
+    font-size: 13px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    margin: 10px 0;
+    width: auto;
+    display: inline-flex;
+}
+
+/* =========================================
+   6. 響應式與捲軸 (Mobile Optimization)
+   ========================================= */
+@media (max-width: 400px) {
+    .container { padding: 20px 15px; }
+    #question-display { font-size: 24px; }
+    #hw-canvas { height: 200px; }
+    .primary-btn { padding: 14px; font-size: 16px; }
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #f8f9fa; }
+::-webkit-scrollbar-thumb { background: #ced4da; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #adb5bd; }

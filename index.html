@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N3 單字高手 Pro - 例句填空強化版</title>
+    <title>N3 單字高手 Pro - AI 語意強化版</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -45,8 +45,20 @@
                     </label>
                     <span>同步學習進度至雲端</span>
                 </div>
+
+                <div class="toggle-group" style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 15px;">
+                    <label class="switch">
+                        <input type="checkbox" id="ai-toggle">
+                        <span class="slider"></span>
+                    </label>
+                    <span style="color: #007bff; font-weight: bold;">開啟 Gemini AI 語意批改 (限中文作答)</span>
+                </div>
+                <div id="ai-settings" class="hidden" style="margin-bottom: 15px;">
+                    <p style="font-size: 12px; color: #666; margin-bottom: 5px;">⚠️ 啟用後將強制進行 25 題測驗，結束後統一交由 AI 對答案。</p>
+                    <input type="password" id="gemini-api-key" placeholder="請輸入 Gemini API Key..." autocomplete="off">
+                </div>
                 
-                <div class="stats-container" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 12px; border: 1px solid #eee;">
+                <div class="stats-container">
                     <h3 style="font-size: 16px; margin-bottom: 10px; color: #444;">📊 弱點分析 (最常錯單字)</h3>
                     <canvas id="errorChart" width="400" height="250"></canvas>
                 </div>
@@ -65,27 +77,27 @@
             
             <div id="question-area">
                 <div id="question-display-container">
-                    <h2 id="question-display" style="line-height: 1.4; margin-bottom: 10px;">載入中...</h2>
+                    <h2 id="question-display">載入中...</h2>
                 </div>
                 
-                <div id="hint-display" style="color: #666; font-size: 15px; margin-bottom: 10px; font-weight: bold; background: #f0f0f0; padding: 5px 10px; border-radius: 5px; display: inline-block;"></div>
+                <div id="hint-display"></div>
                 
                 <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 15px;">
                     <button id="play-audio-btn" class="secondary-btn hidden" style="margin:0; flex: 1;">🔊 重播語音</button>
-                    <button id="give-hint-btn" class="secondary-btn" style="margin:0; flex: 1; background-color: #6c757d;">💡 提示一下</button>
                 </div>
-
-                <div id="word-hint-text" style="color: #fd7e14; font-size: 15px; margin-bottom: 15px; min-height: 20px; font-weight: bold;"></div>
             </div>
 
             <div id="input-area" class="hidden">
-                <input type="text" id="answer-input" placeholder="請在此輸入答案..." autocomplete="off">
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
+                    <input type="text" id="kanji-input" placeholder="請輸入漢字..." autocomplete="off">
+                    <input type="text" id="chinese-input" placeholder="請輸入中文意思..." autocomplete="off">
+                </div>
                 <button id="submit-btn" class="primary-btn">送出答案</button>
             </div>
 
             <div id="canvas-area" class="hidden" style="text-align: center;">
                 <p style="font-size: 14px; color: #555; margin-bottom: 5px;">請在下方區域手寫單字：</p>
-                <canvas id="hw-canvas" width="320" height="240" style="border: 2px solid #333; background: #fff; touch-action: none; border-radius: 8px; cursor: crosshair; box-shadow: 0 4px 10px rgba(0,0,0,0.1);"></canvas>
+                <canvas id="hw-canvas" width="320" height="240"></canvas>
                 <div style="margin-top: 10px;">
                     <button onclick="clearCanvas()" class="secondary-btn" style="display: inline-block; width: auto; padding: 10px 20px;">清除畫板</button>
                     <button id="canvas-submit-btn" class="primary-btn" style="display: inline-block; width: auto; padding: 10px 30px;" onclick="checkAnswer()">我寫好了 (查看答案卡)</button>
@@ -93,8 +105,8 @@
             </div>
 
             <div id="flashcard-area" class="hidden">
-                <div id="flashcard" onclick="checkAnswer()" style="cursor: pointer; background: #fffbe6; border: 2px dashed #ffe58f; padding: 30px; border-radius: 15px; margin-bottom: 20px; text-align: center;">
-                    <div class="card-face" style="font-size: 18px; color: #856404; font-weight: bold;">點擊此處 / 按 Enter 查看完整單字卡</div>
+                <div id="flashcard" onclick="checkAnswer()">
+                    <div class="card-face">點擊此處 / 按 Enter 查看完整單字卡</div>
                 </div>
             </div>
 
@@ -102,41 +114,51 @@
             <button id="next-btn" class="primary-btn hidden">下一題 ➔</button>
         </div>
 
+        <div id="batch-results-area" class="hidden">
+            <h2 style="color: #2c3e50; margin-bottom: 10px;">📊 測驗結算 (AI 批改)</h2>
+            <div id="batch-results-content" style="text-align: left; margin-bottom: 15px;"></div>
+            <button id="batch-finish-btn" class="primary-btn">完成並回首頁</button>
+        </div>
+
         <div id="list-section" class="hidden">
             <div class="header-row">
-                <button onclick="closeListView()" id="home-btn">⬅ 回首頁</button>
+                <button onclick="closeListView()" id="home-btn-list">⬅ 回首頁</button>
             </div>
             <h2 style="margin-top: 10px; color: #2c3e50;">全單字列表</h2>
 
-            <div class="control-group" style="margin-top: 10px; text-align: left; display: flex; gap: 10px;">
+            <div class="control-group" style="margin-top: 15px; margin-bottom: 5px;">
+                <input type="text" id="search-input" placeholder="🔍 搜尋漢字、假名或中文..." autocomplete="off">
+            </div>
+
+            <div class="control-group" style="margin-top: 5px; text-align: left; display: flex; gap: 10px;">
                 <div style="flex: 1;">
                     <label style="font-size: 12px; color: #666;">大類：</label>
-                    <select id="main-category-filter" onchange="updateSubCategories()" style="padding: 8px; font-size: 14px; border-radius: 8px; width: 100%;">
+                    <select id="main-category-filter" onchange="updateSubCategories()">
                         <option value="all">全部</option>
                         <option value="名詞">名詞</option>
                         <option value="動詞">動詞</option>
                         <option value="形容詞">形容詞</option>
-                        <option value="副詞">副詞</option> <option value="慣用">慣用</option>
+                        <option value="副詞">副詞</option> 
+                        <option value="慣用">慣用</option>
                         <option value="其他">其他</option>
                     </select>
                 </div>
                 <div style="flex: 1;">
                     <label style="font-size: 12px; color: #666;">小類：</label>
-                    <select id="pos-filter" onchange="renderVocabList()" style="padding: 8px; font-size: 14px; border-radius: 8px; width: 100%;">
+                    <select id="pos-filter" onchange="renderVocabList()">
                         <option value="all">全部</option>
                     </select>
                 </div>
             </div>
 
-            <div id="vocab-list-container" style="margin-top: 10px; max-height: 60vh; overflow-y: auto; border-radius: 10px; border: 1px solid #eee; background: #fff;">
-                </div>
+            <div id="vocab-list-container"></div>
         </div>
 
-    </div> <div id="word-modal" class="hidden" style="position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:2000; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(4px);">
-        <div class="card-box" style="width: 85%; max-width: 400px; position: relative; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); text-align: left;">
-            <span onclick="closeModal()" style="position: absolute; right: 20px; top: 15px; cursor: pointer; font-size: 28px; color: #aaa;">&times;</span>
-            <div id="modal-content">
-                </div>
+    </div> 
+
+    <div id="word-modal" class="hidden">
+        <div class="modal-card">
+            <div id="modal-content"></div>
         </div>
     </div>
 

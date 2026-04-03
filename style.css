@@ -130,7 +130,6 @@ input:checked + .slider:before { transform: translateX(22px); }
     min-height: 1.2em;
 }
 
-/* 狀態與重音提示 */
 #hint-display {
     font-size: 14px;
     color: #7f8c8d;
@@ -141,7 +140,6 @@ input:checked + .slider:before { transform: translateX(22px); }
     display: inline-block;
 }
 
-/* 💡 提示文字 */
 #word-hint-text {
     color: #e67e22;
     font-size: 15px;
@@ -150,7 +148,6 @@ input:checked + .slider:before { transform: translateX(22px); }
     font-weight: bold;
 }
 
-/* 手寫板區域 */
 #canvas-area {
     margin: 15px 0;
     background: #f8f9fa;
@@ -166,11 +163,11 @@ input:checked + .slider:before { transform: translateX(22px); }
     cursor: crosshair;
     max-width: 100%;
     box-shadow: inset 0 2px 5px rgba(0,0,0,0.05);
-    touch-action: none; /* 重要：防止畫畫時螢幕捲動 */
+    touch-action: none;
 }
 
 /* =========================================
-   4. 單字卡與判定回饋 (Card & Result)
+   4. 單字卡、列表與彈窗 (Card, List & Modal)
    ========================================= */
 .card-box {
     margin-top: 20px;
@@ -188,7 +185,6 @@ input:checked + .slider:before { transform: translateX(22px); }
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* 手動判定區塊 */
 #manual-controls {
     border-bottom: 2px dashed #ffeeba;
     padding-bottom: 15px;
@@ -211,8 +207,54 @@ input:checked + .slider:before { transform: translateX(22px); }
     transform: translateX(3px);
 }
 
-.sentence-row strong { color: #2c3e50; display: block; margin-bottom: 4px; }
-.sentence-row small { color: #6c757d; font-size: 13px; }
+/* ⭐ 單字列表項目優化 (新增編號排列) */
+.list-item {
+    display: flex;
+    align-items: center;
+    transition: background 0.2s;
+    border-bottom: 1px solid #f1f1f1 !important;
+    padding: 12px 10px;
+}
+
+.list-item:hover {
+    background-color: #f0f7ff !important;
+}
+
+/* 編號欄位樣式 */
+.list-item > div:first-child {
+    font-family: "Courier New", Courier, monospace;
+    font-weight: bold;
+    border-right: 1px solid #eee;
+    margin-right: 10px;
+    min-width: 35px;
+}
+
+/* 喇叭按鈕懸停動畫 */
+.list-item button:hover {
+    transform: scale(1.2);
+    color: #fd7e14;
+}
+
+/* ⭐ 詞類篩選選單樣式微調 */
+#pos-filter {
+    background-color: #f8f9fa;
+    border: 1.5px solid #dcdfe6;
+    font-size: 14px;
+    padding: 8px 12px;
+    cursor: pointer;
+}
+
+/* ⭐ 彈窗背景模糊與美化 */
+#word-modal {
+    backdrop-filter: blur(4px);
+    transition: all 0.3s;
+}
+
+#word-modal .card-box {
+    margin-top: 0;
+    border: none;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
 
 /* =========================================
    5. 按鈕樣式 (Buttons)
@@ -292,6 +334,7 @@ button {
     #question-display { font-size: 24px; }
     #hw-canvas { height: 200px; }
     .primary-btn { padding: 14px; font-size: 16px; }
+    .list-item > div:first-child { min-width: 30px; font-size: 11px; }
 }
 
 ::-webkit-scrollbar { width: 6px; }

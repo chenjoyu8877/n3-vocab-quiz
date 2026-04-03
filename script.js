@@ -356,7 +356,7 @@ function startQuiz() {
         });
 
         dueWords.sort(() => Math.random() - 0.5); 
-        batchQuestions = dueWords.slice(0, 10); 
+        batchQuestions = dueWords.slice(0, 5); 
 
         if (batchQuestions.length === 0) { alert("🎉 今日任務已完成！"); return; }
     } else {
@@ -460,16 +460,32 @@ function playTTS(type = 'word', taskId = null) {
     });
 }
 
+// ⭐ 判定顯示邏輯：自動隱藏不必要的判定框
 function showFullCard(isCorrect, userAnswer = "") {
     const isManual = (aType.value === 'flip' || aType.value === 'handwriting');
-    let headerHTML = isManual ? `
-        <div id="manual-controls" style="margin-bottom:15px; background:#fff3cd; padding:12px; border-radius:10px; border:1px solid #ffeeba;">
-            <p style="font-weight:bold; margin-bottom:10px; color:#856404;">請判定您的回答：</p>
-            <div style="display:flex; gap:10px;">
-                <button onclick="manualResult(true)" style="background:#28a745; color:white; flex:1; padding:12px; border-radius:8px; font-weight:bold;">✅ 我對了</button>
-                <button onclick="manualResult(false)" style="background:#dc3545; color:white; flex:1; padding:12px; border-radius:8px; font-weight:bold;">❌ 我錯了</button>
-            </div>
-        </div>` : (isCorrect ? `<h3 style="color:green;">✅ 正確！</h3>` : `<h3 style="color:red;">❌ 答錯了！</h3><p><small>您的輸入：${userAnswer}</small></p><button onclick="undo()" id="undo-btn">🔧 手誤取消懲罰</button>`);
+    
+    // ⭐ 判斷是否雙雙關閉追蹤
+    const trackingDisabled = !srsToggle.checked && !logToggle.checked; 
+
+    let headerHTML = "";
+
+    if (isManual) {
+        if (trackingDisabled) {
+            // 沒開追蹤，就不顯示對錯按鈕
+            headerHTML = `<h3 style="color:#007bff; margin-bottom:15px;">💡 單字解答</h3>`;
+        } else {
+            headerHTML = `
+                <div id="manual-controls" style="margin-bottom:15px; background:#fff3cd; padding:12px; border-radius:10px; border:1px solid #ffeeba;">
+                    <p style="font-weight:bold; margin-bottom:10px; color:#856404;">請判定您的回答：</p>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="manualResult(true)" style="background:#28a745; color:white; flex:1; padding:12px; border-radius:8px; font-weight:bold;">✅ 我對了</button>
+                        <button onclick="manualResult(false)" style="background:#dc3545; color:white; flex:1; padding:12px; border-radius:8px; font-weight:bold;">❌ 我錯了</button>
+                    </div>
+                </div>`;
+        }
+    } else {
+        headerHTML = isCorrect ? `<h3 style="color:green;">✅ 正確！</h3>` : `<h3 style="color:red;">❌ 答錯了！</h3><p><small>您的輸入：${userAnswer}</small></p><button onclick="undo()" id="undo-btn">🔧 手誤取消懲罰</button>`;
+    }
 
     feedback.innerHTML = `
         <div class="card-box" style="border: 2px solid #ccc; padding: 15px; border-radius: 10px; background: #fff; margin-top: 15px; text-align: left;">
@@ -484,7 +500,11 @@ function showFullCard(isCorrect, userAnswer = "") {
             </div>
         </div>
     `;
-    if (!isManual) nextBtn.classList.remove('hidden');
+    
+    // ⭐ 如果是手動判定但沒開追蹤，或是非手動模式，直接開放下一題按鈕
+    if (!isManual || trackingDisabled) {
+        nextBtn.classList.remove('hidden');
+    }
 }
 
 async function checkAnswer() {
@@ -579,7 +599,6 @@ async function processBatchResults() {
     }
 }
 
-// ⭐ 更新：加入 onclick 點擊展開單字卡功能
 function renderBatchResults(aiResults) {
     feedback.innerHTML = "";
     batchResultsArea.classList.remove('hidden');
@@ -612,7 +631,6 @@ function renderBatchResults(aiResults) {
         const boxColor = finalCorrect ? '#c3e6cb' : '#f5c6cb';
         const aiTagStr = `<span style="color:${aiResult ? 'green' : 'red'}; font-weight:bold;">${aiResult ? 'AI 判定正確' : 'AI 判定錯誤'}</span>`;
 
-        // ⭐ 取得單字在總詞庫中的 Index，並加上 onclick 與 hover 動畫
         const wordIndex = vocabData.indexOf(item.word);
 
         html += `

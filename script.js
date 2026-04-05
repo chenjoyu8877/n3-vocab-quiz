@@ -58,8 +58,10 @@ let lastEnterTime = 0;
 const ENTER_CD_MS = 600; 
 let audioSequenceId = 0; 
 
-// ⭐ 進度統計變數
+// ⭐ 進度統計與延遲批改變數
 let sessionReviewCount = 0;
+let hwChoices = {};           // 儲存批次手寫的暫存選擇
+let currentManualChoice = null; // 儲存單題翻卡的暫存選擇
 
 // 批次測驗變數
 let isBatchMode = false;
@@ -70,7 +72,6 @@ let currentBatchIdx = 0;
 // 手寫批次變數
 let isHwBatchMode = false;
 let hwQuestions = [];
-let hwGradedCount = 0;
 
 const categoryMap = {
     '名詞': ['名詞', '代名詞', '形式名詞'],
@@ -199,7 +200,7 @@ async function loadVocabCSV() {
     });
 }
 
-// ⭐ 獨立出來的核心同步模組，確保「單字列表」與「開始測驗」都不會漏抓雲端資料
+// 核心同步模組
 async function ensureDataLoaded(btnElement) {
     if (vocabData.length > 0) return; 
     
@@ -223,7 +224,6 @@ async function ensureDataLoaded(btnElement) {
     btnElement.innerText = originalText;
 }
 
-// 改變原本的載入邏輯，透過 ensureDataLoaded 來處理
 async function loadAndSyncData() {
     await ensureDataLoaded(startBtn);
     startQuiz();
@@ -254,7 +254,6 @@ function getNextWord() {
     return dueWords[Math.floor(Math.random() * dueWords.length)];
 }
 
-// ⭐ 動態更新與顯示測驗進度條
 function updateStatsBar() {
     let bar = document.getElementById('quiz-stats-bar');
     if (!bar) {
@@ -276,10 +275,9 @@ function updateStatsBar() {
     bar.innerHTML = `<span>📚 總單字: ${vocabData.length}</span> <span style="color:#d9534f;">⏳ 待測驗: ${pending}</span> <span style="color:#28a745;">🎯 已測驗: ${sessionReviewCount}</span>`;
 }
 
-
 // --- 5. 單字列表渲染 ---
 async function showListView() {
-    await ensureDataLoaded(viewListBtn); // 確保先抓好雲端資料再渲染列表
+    await ensureDataLoaded(viewListBtn); 
     mainCategoryFilter.value = 'all';
     searchInput.value = ''; 
     updateSubCategories(); 
@@ -354,20 +352,19 @@ function renderVocabList() {
         const displayKana = w['假名拼音(分別)'] || w['假名拼音'] || "";
         const displayAccent = w['重音'] || "";
 
-        // ⭐ 升級：給予 1 到 7 級不同的專屬色階
         const lvLevel = w.nextReviewDate ? parseInt(w.level) : -1;
         let lvText = '未測';
         let lvBg = '#f8f9fa';
         let lvColor = '#6c757d';
 
-        if (lvLevel === 0) { lvBg = '#f8d7da'; lvColor = '#721c24'; lvText = 'Lv.0'; } // 紅色 (需加強)
-        else if (lvLevel === 1) { lvBg = '#fff3cd'; lvColor = '#856404'; lvText = 'Lv.1'; } // 黃色
-        else if (lvLevel === 2) { lvBg = '#cce5ff'; lvColor = '#004085'; lvText = 'Lv.2'; } // 藍色
-        else if (lvLevel === 3) { lvBg = '#d4edda'; lvColor = '#155724'; lvText = 'Lv.3'; } // 綠色
-        else if (lvLevel === 4) { lvBg = '#e2d9f3'; lvColor = '#4a148c'; lvText = 'Lv.4'; } // 紫色
-        else if (lvLevel === 5) { lvBg = '#fce4ec'; lvColor = '#ad1457'; lvText = 'Lv.5'; } // 粉紅色
-        else if (lvLevel === 6) { lvBg = '#e0f2f1'; lvColor = '#006064'; lvText = 'Lv.6'; } // 藍綠色
-        else if (lvLevel >= 7) { lvBg = '#343a40'; lvColor = '#ffd700'; lvText = `Lv.${lvLevel}`; } // 黑底金字 (終極)
+        if (lvLevel === 0) { lvBg = '#f8d7da'; lvColor = '#721c24'; lvText = 'Lv.0'; }
+        else if (lvLevel === 1) { lvBg = '#fff3cd'; lvColor = '#856404'; lvText = 'Lv.1'; }
+        else if (lvLevel === 2) { lvBg = '#cce5ff'; lvColor = '#004085'; lvText = 'Lv.2'; }
+        else if (lvLevel === 3) { lvBg = '#d4edda'; lvColor = '#155724'; lvText = 'Lv.3'; }
+        else if (lvLevel === 4) { lvBg = '#e2d9f3'; lvColor = '#4a148c'; lvText = 'Lv.4'; }
+        else if (lvLevel === 5) { lvBg = '#fce4ec'; lvColor = '#ad1457'; lvText = 'Lv.5'; }
+        else if (lvLevel === 6) { lvBg = '#e0f2f1'; lvColor = '#006064'; lvText = 'Lv.6'; }
+        else if (lvLevel >= 7) { lvBg = '#343a40'; lvColor = '#ffd700'; lvText = `Lv.${lvLevel}`; }
 
         item.innerHTML = `
             <div style="width: 45px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
@@ -419,11 +416,53 @@ function playListAudio(index) {
    player.play().catch(() => { console.warn(`音檔不存在: ${audioUrl}`); });
 }
 
+// ⭐ 處理儲存的成績
+function processManualChoice() {
+    if (currentManualChoice !== null) {
+        if (currentManualChoice) {
+            currentWord.level++;
+            updateLocalNextReviewDate(currentWord, "SUCCESS");
+            syncToCloud("SUCCESS", currentWord);
+        } else {
+            currentWord.errorCount++;
+            currentWord.level = Math.max(0, currentWord.level - 1);
+            updateLocalNextReviewDate(currentWord, "ERROR");
+            syncToCloud("ERROR", currentWord);
+        }
+        currentManualChoice = null; // 重置
+    }
+}
+
+function processHwChoices() {
+    Object.keys(hwChoices).forEach(idxStr => {
+        const idx = parseInt(idxStr);
+        const w = hwQuestions[idx];
+        const isCorrect = hwChoices[idx];
+        if (isCorrect) {
+            w.level++;
+            updateLocalNextReviewDate(w, "SUCCESS");
+            syncToCloud("SUCCESS", w);
+        } else {
+            w.errorCount++;
+            w.level = Math.max(0, w.level - 1);
+            updateLocalNextReviewDate(w, "ERROR");
+            syncToCloud("ERROR", w);
+        }
+    });
+    hwChoices = {}; 
+}
+
 // --- 6. 測驗管理流程 ---
 function startQuiz() { 
+    processManualChoice(); 
+    processHwChoices();
+
     batchResultsContent.innerHTML = "";
     feedback.innerHTML = "";
-    updateStatsBar(); // 開局初始化數據條
+    hwChoices = {}; 
+    currentManualChoice = null;
+
+    updateStatsBar(); 
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     let dueWords = vocabData.filter(w => {
@@ -468,7 +507,6 @@ function startQuiz() {
     else if (aType.value === 'handwriting') {
         isHwBatchMode = true;
         isBatchMode = false;
-        hwGradedCount = 0;
         hwQuestions = dueWords.slice(0, HW_BATCH_SIZE);
         
         if (hwQuestions.length === 0) { 
@@ -570,10 +608,9 @@ function renderHwBatch() {
                     <button onclick="showWordDetail(${wordIdx})" class="secondary-btn" style="margin-bottom:10px; width:auto; padding:4px 8px; font-size:12px; color:#007bff; background:#e9ecef;">🔍 展開單字卡</button>
                     
                     <div style="display:flex; gap:10px;" id="hw-ctrl-${idx}">
-                        <button onclick="gradeHwCard(${idx}, true)" style="background:#28a745; color:white; flex:1; padding:10px; border-radius:8px; font-weight:bold;">✅ 我寫對了</button>
-                        <button onclick="gradeHwCard(${idx}, false)" style="background:#dc3545; color:white; flex:1; padding:10px; border-radius:8px; font-weight:bold;">❌ 我寫錯了</button>
+                        <button id="hw-btn-true-${idx}" onclick="gradeHwCard(${idx}, true)" class="hw-grade-btn" style="background:#e8f5e9; color:#28a745; border: 2px solid #28a745; flex:1; padding:10px; border-radius:8px; font-weight:bold; transition:all 0.2s;">✅ 我寫對了</button>
+                        <button id="hw-btn-false-${idx}" onclick="gradeHwCard(${idx}, false)" class="hw-grade-btn" style="background:#fdeeed; color:#dc3545; border: 2px solid #dc3545; flex:1; padding:10px; border-radius:8px; font-weight:bold; transition:all 0.2s;">❌ 我寫錯了</button>
                     </div>
-                    <div id="hw-result-${idx}" class="hidden" style="font-weight:bold; padding:10px; border-radius:8px; text-align:center;"></div>
                 </div>
             </div>
         `;
@@ -597,47 +634,44 @@ window.flipAllHwCards = () => {
     hwQuestions.forEach((_, idx) => flipHwCard(idx));
 };
 
+// ⭐ 可更換選擇的評分邏輯 (UI切換，資料存入暫存區)
 window.gradeHwCard = (idx, isCorrect) => {
-    const w = hwQuestions[idx];
-    const resBox = document.getElementById(`hw-result-${idx}`);
-    const ctrlBox = document.getElementById(`hw-ctrl-${idx}`);
-
+    hwChoices[idx] = isCorrect;
+    
+    const btnTrue = document.getElementById(`hw-btn-true-${idx}`);
+    const btnFalse = document.getElementById(`hw-btn-false-${idx}`);
+    
     if (isCorrect) {
-        w.level++;
-        updateLocalNextReviewDate(w, "SUCCESS");
-        syncToCloud("SUCCESS", w);
-        resBox.innerHTML = '✅ 已記錄為正確';
-        resBox.style.backgroundColor = '#d4edda';
-        resBox.style.color = '#155724';
+        btnTrue.style.background = '#28a745';
+        btnTrue.style.color = 'white';
+        btnFalse.style.background = '#fdeeed';
+        btnFalse.style.color = '#dc3545';
     } else {
-        w.errorCount++;
-        w.level = Math.max(0, w.level - 1);
-        updateLocalNextReviewDate(w, "ERROR");
-        syncToCloud("ERROR", w);
-        resBox.innerHTML = '❌ 已記錄為錯誤，將加強複習';
-        resBox.style.backgroundColor = '#f8d7da';
-        resBox.style.color = '#721c24';
+        btnFalse.style.background = '#dc3545';
+        btnFalse.style.color = 'white';
+        btnTrue.style.background = '#e8f5e9';
+        btnTrue.style.color = '#28a745';
     }
     
-    resBox.classList.remove('hidden');
-    ctrlBox.classList.add('hidden');
-    
-    hwGradedCount++;
-    if (hwGradedCount >= hwQuestions.length) {
+    // 若所有題目都已經有選擇，自動展開底部按鈕區
+    if (Object.keys(hwChoices).length >= hwQuestions.length) {
         document.getElementById('hw-finish-area').classList.remove('hidden');
     }
 };
 
 window.finishHwBatch = () => {
+    processHwChoices();
     homeBtn.click(); 
 };
 
 window.nextHwBatch = () => {
+    processHwChoices();
     startQuiz(); 
 };
 
 
 function nextQuestion() {
+    processManualChoice(); // 換題前確實送出上一題的成績
     stopAllAudio();
     updateStatsBar(); 
     feedback.innerHTML = ''; kanjiInput.value = ''; chineseInput.value = ''; 
@@ -730,6 +764,27 @@ function playTTS(type = 'word', taskId = null) {
     });
 }
 
+// ⭐ 單題翻卡模式的暫存 UI 與控制邏輯
+window.manualResultUI = (isCorrect) => {
+    currentManualChoice = isCorrect;
+    const btnTrue = document.getElementById('manual-btn-true');
+    const btnFalse = document.getElementById('manual-btn-false');
+    
+    if (isCorrect) {
+        btnTrue.style.background = '#28a745';
+        btnTrue.style.color = 'white';
+        btnFalse.style.background = '#fdeeed';
+        btnFalse.style.color = '#dc3545';
+    } else {
+        btnFalse.style.background = '#dc3545';
+        btnFalse.style.color = 'white';
+        btnTrue.style.background = '#e8f5e9';
+        btnTrue.style.color = '#28a745';
+    }
+    
+    nextBtn.classList.remove('hidden'); // 解鎖進入下一題
+};
+
 function showFullCard(isCorrect, userAnswer = "") {
     const isManual = (aType.value === 'flip');
     const trackingDisabled = !srsToggle.checked && !logToggle.checked; 
@@ -740,12 +795,13 @@ function showFullCard(isCorrect, userAnswer = "") {
         if (trackingDisabled) {
             headerHTML = `<h3 style="color:#007bff; margin-bottom:15px;">💡 單字解答</h3>`;
         } else {
+            // ⭐ 翻卡模式專用評分按鈕
             headerHTML = `
                 <div id="manual-controls" style="margin-bottom:15px; background:#fff3cd; padding:12px; border-radius:10px; border:1px solid #ffeeba;">
                     <p style="font-weight:bold; margin-bottom:10px; color:#856404;">請判定您的回答：</p>
                     <div style="display:flex; gap:10px;">
-                        <button onclick="manualResult(true)" style="background:#28a745; color:white; flex:1; padding:12px; border-radius:8px; font-weight:bold;">✅ 我對了</button>
-                        <button onclick="manualResult(false)" style="background:#dc3545; color:white; flex:1; padding:12px; border-radius:8px; font-weight:bold;">❌ 我錯了</button>
+                        <button id="manual-btn-true" onclick="manualResultUI(true)" style="background:#e8f5e9; color:#28a745; border: 2px solid #28a745; flex:1; padding:12px; border-radius:8px; font-weight:bold; transition:all 0.2s;">✅ 我對了</button>
+                        <button id="manual-btn-false" onclick="manualResultUI(false)" style="background:#fdeeed; color:#dc3545; border: 2px solid #dc3545; flex:1; padding:12px; border-radius:8px; font-weight:bold; transition:all 0.2s;">❌ 我錯了</button>
                     </div>
                 </div>`;
         }
@@ -771,6 +827,7 @@ function showFullCard(isCorrect, userAnswer = "") {
         </div>
     `;
     
+    // 如果是非手動或是沒開啟追蹤，直接顯示下一題
     if (!isManual || trackingDisabled) {
         nextBtn.classList.remove('hidden');
     }
@@ -994,6 +1051,8 @@ batchFinishBtn.onclick = () => {
 };
 
 homeBtn.onclick = () => { 
+    processManualChoice();
+    processHwChoices();
     stopAllAudio(); 
     quizSection.classList.add('hidden'); 
     batchResultsArea.classList.add('hidden'); 
@@ -1039,23 +1098,6 @@ async function refreshHomeStats() {
     }
     return null;
 }
-
-window.manualResult = (isCorrect) => {
-    if (isCorrect) { 
-        currentWord.level++; 
-        updateLocalNextReviewDate(currentWord, "SUCCESS");
-        syncToCloud("SUCCESS", currentWord); 
-        nextQuestion(); 
-    } else {
-        currentWord.errorCount++; 
-        currentWord.level = Math.max(0, currentWord.level - 1);
-        updateLocalNextReviewDate(currentWord, "ERROR");
-        syncToCloud("ERROR", currentWord);
-        const ctrl = document.getElementById('manual-controls');
-        if (ctrl) ctrl.innerHTML = `<h3 style="color:red; margin:0;">❌ 判定錯誤</h3>`;
-        nextBtn.classList.remove('hidden');
-    }
-};
 
 window.undo = () => {
     currentWord.errorCount--; 

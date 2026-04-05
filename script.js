@@ -1112,4 +1112,3 @@ window.onclick = (event) => {
         closeModal(); 
     }
 };
-}

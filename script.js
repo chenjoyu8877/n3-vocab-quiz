@@ -38,7 +38,6 @@ const mainCategoryFilter = document.getElementById('main-category-filter');
 const posFilter = document.getElementById('pos-filter');
 const searchInput = document.getElementById('search-input');
 
-// ⭐ AI 相關元素
 const aiToggle = document.getElementById('ai-toggle');
 const aiSettings = document.getElementById('ai-settings');
 const geminiApiKeyInput = document.getElementById('gemini-api-key');
@@ -58,10 +57,11 @@ let lastEnterTime = 0;
 const ENTER_CD_MS = 600; 
 let audioSequenceId = 0; 
 
-// ⭐ 進度統計與延遲批改變數
-let sessionReviewCount = 0;
-let hwChoices = {};           // 儲存批次手寫的暫存選擇
-let currentManualChoice = null; // 儲存單題翻卡的暫存選擇
+// ⭐ 延遲批改與【錯題特訓】變數
+let hwChoices = {};           
+let currentManualChoice = null; 
+let sessionMistakes = new Set(); // 儲存錯題
+let isMistakeMode = false;       // 是否處於錯題特訓模式
 
 // 批次測驗變數
 let isBatchMode = false;
@@ -187,20 +187,50 @@ aType.addEventListener('change', () => {
 });
 
 
+// ⭐ 核心時間偏移函數：將時間倒退 8 小時
+// 讓 00:00 ~ 07:59 的時間判定為「昨天」
+function getStudyDate(dateInput) {
+    let d = new Date(dateInput);
+    if (isNaN(d.getTime())) return new Date(0); // 防止解析錯誤
+    d.setHours(d.getHours() - 8);
+    return d;
+}
+
+function isTestedToday(wordObj) {
+    if (!wordObj.lastReview) return false;
+    
+    let lr = new Date(wordObj.lastReview);
+    
+    // 如果日期格式較舊無法解析，嘗試清理中文字串
+    if (isNaN(lr.getTime())) {
+        const cleanStr = wordObj.lastReview.toString().replace(/上午|下午/g, '').replace(/AM|PM/gi, '').trim();
+        lr = new Date(cleanStr);
+        if (isNaN(lr.getTime())) return false; // 仍解析失敗則放棄
+    }
+    
+    // 使用專屬的「學習日」來做比較 (扣除 8 小時)
+    const lrStudyDate = getStudyDate(lr);
+    const todayStudyDate = getStudyDate(new Date());
+    
+    return lrStudyDate.getFullYear() === todayStudyDate.getFullYear() &&
+           lrStudyDate.getMonth() === todayStudyDate.getMonth() &&
+           lrStudyDate.getDate() === todayStudyDate.getDate();
+}
+
 async function loadVocabCSV() {
     return new Promise((resolve) => {
         Papa.parse("vocab.csv", {
             download: true, header: true,
             complete: (results) => {
                 vocabData = results.data.filter(row => row['中文意思'] && (row['漢字'] || row['假名拼音']))
-                    .map(item => ({ ...item, errorCount: 0, level: 0, nextReviewDate: "" }));
+                    .map(item => ({ ...item, errorCount: 0, level: 0, nextReviewDate: "", lastReview: "" }));
                 resolve();
             }
         });
     });
 }
 
-// 核心同步模組
+// 核心同步模組：包含載入歷史錯題
 async function ensureDataLoaded(btnElement) {
     if (vocabData.length > 0) return; 
     
@@ -209,6 +239,9 @@ async function ensureDataLoaded(btnElement) {
     
     await loadVocabCSV();
     const cloudData = await refreshHomeStats();
+    
+    sessionMistakes.clear(); // 載入前清空錯題暫存
+    
     if (cloudData) {
         const map = new Map(cloudData.map(p => [p.wordId, p]));
         vocabData.forEach(w => {
@@ -218,9 +251,16 @@ async function ensureDataLoaded(btnElement) {
                 w.errorCount = parseInt(p.errorCount) || 0; 
                 w.level = parseInt(p.level) || 0; 
                 w.nextReviewDate = p.nextReviewDate || ""; 
+                w.lastReview = p.lastReview || ""; 
+                
+                // ⭐ 將雲端的歷史錯題 (Level=0且錯過) 自動載入「錯題特訓」中
+                if (w.level === 0 && w.errorCount > 0) {
+                    sessionMistakes.add(w);
+                }
             }
         });
     }
+    updateMistakeBtn(); // 更新錯題按鈕顯示
     btnElement.innerText = originalText;
 }
 
@@ -229,31 +269,32 @@ async function loadAndSyncData() {
     startQuiz();
 }
 
-function getNextWord() {
-    if (isBatchMode) {
-        if (currentBatchIdx >= batchQuestions.length) return null;
-        return batchQuestions[currentBatchIdx];
+// ⭐ 動態更新首頁的「錯題特訓」按鈕
+function updateMistakeBtn() {
+    let btn = document.getElementById('mistake-btn');
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'mistake-btn';
+        btn.className = 'primary-btn'; 
+        btn.style.marginTop = '10px';
+        btn.style.backgroundColor = '#ff4d4f';
+        btn.style.color = 'white';
+        btn.style.fontWeight = 'bold';
+        btn.onclick = () => {
+            isMistakeMode = true;
+            startQuiz();
+        };
+        document.getElementById('setup-section').appendChild(btn);
     }
-
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    let dueWords = vocabData.filter(w => {
-        if (!w.nextReviewDate) return true;
-        const nextDate = new Date(w.nextReviewDate);
-        nextDate.setHours(0, 0, 0, 0);
-        return nextDate <= today;
-    });
-    if (dueWords.length === 0) { 
-        alert("🎉 今日任務已完成！"); 
-        homeBtn.click(); 
-        return null; 
+    if (sessionMistakes.size > 0) {
+        btn.innerHTML = `🔥 錯題特訓 (${sessionMistakes.size} 題待消滅)`;
+        btn.classList.remove('hidden');
+    } else {
+        btn.classList.add('hidden');
     }
-    if (srsToggle.checked) {
-        let lowLevel = dueWords.filter(w => w.level < 3);
-        if (lowLevel.length > 0 && Math.random() < 0.8) return lowLevel[Math.floor(Math.random() * lowLevel.length)];
-    }
-    return dueWords[Math.floor(Math.random() * dueWords.length)];
 }
 
+// ⭐ 絕對精準的數據條 (以 8:00 AM 為日界線，從雲端紀錄掃描)
 function updateStatsBar() {
     let bar = document.getElementById('quiz-stats-bar');
     if (!bar) {
@@ -265,14 +306,23 @@ function updateStatsBar() {
         headerRow.parentNode.insertBefore(bar, headerRow.nextSibling); 
     }
     
-    const today = new Date(); today.setHours(0,0,0,0);
-    let pending = vocabData.filter(w => {
-        if (!w.nextReviewDate) return true;
-        const nd = new Date(w.nextReviewDate); nd.setHours(0,0,0,0);
-        return nd <= today;
+    const todayStudy = getStudyDate(new Date());
+    todayStudy.setHours(0,0,0,0); // 歸零進行純日期比較
+    
+    // 動態掃描：真的在今天考過的數量
+    let testedTodayCount = vocabData.filter(w => isTestedToday(w)).length;
+    
+    // 動態掃描：扣除今天考過的，剩下應該今天要背的
+    let pendingCount = vocabData.filter(w => {
+        if (isTestedToday(w)) return false; 
+        if (!w.nextReviewDate) return true; // 新單字
+        const nd = new Date(w.nextReviewDate);
+        nd.setHours(0,0,0,0);
+        return nd <= todayStudy;
     }).length;
     
-    bar.innerHTML = `<span>📚 總單字: ${vocabData.length}</span> <span style="color:#d9534f;">⏳ 待測驗: ${pending}</span> <span style="color:#28a745;">🎯 已測驗: ${sessionReviewCount}</span>`;
+    let modeText = isMistakeMode ? `<span style="color:#ff4d4f;">🔥 錯題特訓中</span>` : `<span>📚 總單字: ${vocabData.length}</span>`;
+    bar.innerHTML = `${modeText} <span style="color:#d9534f;">⏳ 待測驗: ${pendingCount}</span> <span style="color:#28a745;">🎯 已測驗: ${testedTodayCount}</span>`;
 }
 
 // --- 5. 單字列表渲染 ---
@@ -416,7 +466,6 @@ function playListAudio(index) {
    player.play().catch(() => { console.warn(`音檔不存在: ${audioUrl}`); });
 }
 
-// ⭐ 處理儲存的成績
 function processManualChoice() {
     if (currentManualChoice !== null) {
         if (currentManualChoice) {
@@ -429,7 +478,7 @@ function processManualChoice() {
             updateLocalNextReviewDate(currentWord, "ERROR");
             syncToCloud("ERROR", currentWord);
         }
-        currentManualChoice = null; // 重置
+        currentManualChoice = null; 
     }
 }
 
@@ -464,13 +513,31 @@ function startQuiz() {
 
     updateStatsBar(); 
 
-    const today = new Date(); today.setHours(0, 0, 0, 0);
-    let dueWords = vocabData.filter(w => {
-        if (!w.nextReviewDate) return true;
-        const nextDate = new Date(w.nextReviewDate);
-        nextDate.setHours(0, 0, 0, 0);
-        return nextDate <= today;
-    });
+    let dueWords = [];
+
+    // ⭐ 如果是錯題特訓模式，無腦抓出錯題清單考到底
+    if (isMistakeMode) {
+        dueWords = Array.from(sessionMistakes);
+        if (dueWords.length === 0) {
+            alert("✅ 錯題已全數消滅！太棒了！");
+            isMistakeMode = false;
+            updateMistakeBtn();
+            homeBtn.click();
+            return;
+        }
+    } else {
+        const todayStudy = getStudyDate(new Date()); 
+        todayStudy.setHours(0, 0, 0, 0); // 8點基準歸零
+        
+        dueWords = vocabData.filter(w => {
+            if (isTestedToday(w)) return false; // 扣除今天已測的
+            
+            if (!w.nextReviewDate) return true;
+            const nextDate = new Date(w.nextReviewDate);
+            nextDate.setHours(0, 0, 0, 0);
+            return nextDate <= todayStudy;
+        });
+    }
 
     dueWords.sort(() => Math.random() - 0.5); 
 
@@ -496,7 +563,7 @@ function startQuiz() {
         batchAnswers = []; 
         currentBatchIdx = 0;
 
-        batchQuestions = dueWords.slice(0, AI_BATCH_SIZE); 
+        batchQuestions = dueWords.slice(0, Math.min(AI_BATCH_SIZE, dueWords.length)); 
         if (batchQuestions.length === 0) { 
             alert("🎉 今日任務已完成！"); 
             startBtn.innerText = "開始測驗"; 
@@ -507,7 +574,7 @@ function startQuiz() {
     else if (aType.value === 'handwriting') {
         isHwBatchMode = true;
         isBatchMode = false;
-        hwQuestions = dueWords.slice(0, HW_BATCH_SIZE);
+        hwQuestions = dueWords.slice(0, Math.min(HW_BATCH_SIZE, dueWords.length));
         
         if (hwQuestions.length === 0) { 
             alert("🎉 今日任務已完成！"); 
@@ -541,6 +608,48 @@ function startQuiz() {
     nextQuestion(); 
 }
 
+function getNextWord() {
+    if (isBatchMode) {
+        if (currentBatchIdx >= batchQuestions.length) return null;
+        return batchQuestions[currentBatchIdx];
+    }
+
+    let dueWords = [];
+    if (isMistakeMode) {
+        dueWords = Array.from(sessionMistakes);
+        if (dueWords.length === 0) {
+            alert("✅ 錯題已全數消滅！太棒了！");
+            isMistakeMode = false;
+            updateMistakeBtn();
+            homeBtn.click();
+            return null;
+        }
+    } else {
+        const todayStudy = getStudyDate(new Date()); 
+        todayStudy.setHours(0, 0, 0, 0);
+        
+        dueWords = vocabData.filter(w => {
+            if (isTestedToday(w)) return false; 
+            if (!w.nextReviewDate) return true;
+            const nextDate = new Date(w.nextReviewDate);
+            nextDate.setHours(0, 0, 0, 0);
+            return nextDate <= todayStudy;
+        });
+        if (dueWords.length === 0) { 
+            alert("🎉 今日任務已完成！"); 
+            homeBtn.click(); 
+            return null; 
+        }
+    }
+
+    if (srsToggle.checked && !isMistakeMode) {
+        let lowLevel = dueWords.filter(w => w.level < 3);
+        if (lowLevel.length > 0 && Math.random() < 0.8) return lowLevel[Math.floor(Math.random() * lowLevel.length)];
+    }
+    return dueWords[Math.floor(Math.random() * dueWords.length)];
+}
+
+
 window.playBatchAudio = (idx, type = 'word') => {
     const w = hwQuestions[idx];
     const baseName = getBaseName(w);
@@ -549,7 +658,6 @@ window.playBatchAudio = (idx, type = 'word') => {
     player.play().catch(() => { console.warn(`音檔不存在: ${audioUrl}`); });
 };
 
-// 手寫模式專屬：批次渲染畫面
 function renderHwBatch() {
     stopAllAudio();
     updateStatsBar(); 
@@ -559,9 +667,11 @@ function renderHwBatch() {
     document.getElementById('flashcard-area').classList.add('hidden');
     nextBtn.classList.add('hidden');
 
+    let modeTitle = isMistakeMode ? `<span style="color:#ff4d4f;">🔥 錯題手寫特訓 (${hwQuestions.length} 題)</span>` : `✍️ 手寫練習 (${hwQuestions.length} 題)`;
+
     let html = `
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-            <h2 style="margin:0; color:#2c3e50;">✍️ 手寫練習 (${hwQuestions.length} 題)</h2>
+            <h2 style="margin:0; color:#2c3e50;">${modeTitle}</h2>
             <button onclick="flipAllHwCards()" class="secondary-btn" style="background:#007bff; color:white; padding:8px 15px;">全部翻開</button>
         </div>
         <p style="text-align:left; font-size:13px; color:#666; margin-bottom:15px;">請在筆記本上依序寫下答案，完成後點擊翻開對答案。</p>
@@ -591,6 +701,7 @@ function renderHwBatch() {
         }
 
         const wordIdx = vocabData.indexOf(w);
+        const displayKana = w['假名拼音(分別)'] || w['假名拼音'] || ""; // ⭐ 修正為分別
 
         html += `
             <div class="card-box" id="hw-card-${idx}" style="padding:15px; border-left:5px solid #007bff; margin-top:0;">
@@ -602,7 +713,7 @@ function renderHwBatch() {
                 </div>
                 
                 <div id="hw-ans-${idx}" class="hidden" style="margin-top:15px; padding-top:15px; border-top:1px dashed #ccc; text-align:left;">
-                    <div style="font-size: 22px;"><strong>${w['漢字']}</strong> (${w['假名拼音']})</div>
+                    <div style="font-size: 22px;"><strong>${w['漢字']}</strong> (${displayKana})</div>
                     <div style="color: #d9534f; font-weight: bold;">中文：${w['中文意思']}</div>
                     
                     <button onclick="showWordDetail(${wordIdx})" class="secondary-btn" style="margin-bottom:10px; width:auto; padding:4px 8px; font-size:12px; color:#007bff; background:#e9ecef;">🔍 展開單字卡</button>
@@ -634,7 +745,6 @@ window.flipAllHwCards = () => {
     hwQuestions.forEach((_, idx) => flipHwCard(idx));
 };
 
-// ⭐ 可更換選擇的評分邏輯 (UI切換，資料存入暫存區)
 window.gradeHwCard = (idx, isCorrect) => {
     hwChoices[idx] = isCorrect;
     
@@ -653,7 +763,6 @@ window.gradeHwCard = (idx, isCorrect) => {
         btnTrue.style.color = '#28a745';
     }
     
-    // 若所有題目都已經有選擇，自動展開底部按鈕區
     if (Object.keys(hwChoices).length >= hwQuestions.length) {
         document.getElementById('hw-finish-area').classList.remove('hidden');
     }
@@ -671,7 +780,7 @@ window.nextHwBatch = () => {
 
 
 function nextQuestion() {
-    processManualChoice(); // 換題前確實送出上一題的成績
+    processManualChoice(); 
     stopAllAudio();
     updateStatsBar(); 
     feedback.innerHTML = ''; kanjiInput.value = ''; chineseInput.value = ''; 
@@ -764,7 +873,6 @@ function playTTS(type = 'word', taskId = null) {
     });
 }
 
-// ⭐ 單題翻卡模式的暫存 UI 與控制邏輯
 window.manualResultUI = (isCorrect) => {
     currentManualChoice = isCorrect;
     const btnTrue = document.getElementById('manual-btn-true');
@@ -782,7 +890,7 @@ window.manualResultUI = (isCorrect) => {
         btnTrue.style.color = '#28a745';
     }
     
-    nextBtn.classList.remove('hidden'); // 解鎖進入下一題
+    nextBtn.classList.remove('hidden'); 
 };
 
 function showFullCard(isCorrect, userAnswer = "") {
@@ -795,7 +903,6 @@ function showFullCard(isCorrect, userAnswer = "") {
         if (trackingDisabled) {
             headerHTML = `<h3 style="color:#007bff; margin-bottom:15px;">💡 單字解答</h3>`;
         } else {
-            // ⭐ 翻卡模式專用評分按鈕
             headerHTML = `
                 <div id="manual-controls" style="margin-bottom:15px; background:#fff3cd; padding:12px; border-radius:10px; border:1px solid #ffeeba;">
                     <p style="font-weight:bold; margin-bottom:10px; color:#856404;">請判定您的回答：</p>
@@ -810,11 +917,12 @@ function showFullCard(isCorrect, userAnswer = "") {
     }
 
     const wordIdx = vocabData.indexOf(currentWord);
+    const displayKana = currentWord['假名拼音(分別)'] || currentWord['假名拼音'] || ""; // ⭐ 修正為分別
 
     feedback.innerHTML = `
         <div class="card-box" style="border: 2px solid #ccc; padding: 15px; border-radius: 10px; background: #fff; margin-top: 15px; text-align: left;">
             ${headerHTML}
-            <div style="font-size: 24px;"><strong>${currentWord['漢字']}</strong> (${currentWord['假名拼音']})</div>
+            <div style="font-size: 24px;"><strong>${currentWord['漢字']}</strong> (${displayKana})</div>
             <div style="color: #d9534f; font-weight: bold;">中文：${currentWord['中文意思']}</div>
             <div style="font-size: 14px; color: #777;">[${currentWord['詞性']}] | 重音：${currentWord['重音'] || '-'}</div>
             
@@ -827,7 +935,6 @@ function showFullCard(isCorrect, userAnswer = "") {
         </div>
     `;
     
-    // 如果是非手動或是沒開啟追蹤，直接顯示下一題
     if (!isManual || trackingDisabled) {
         nextBtn.classList.remove('hidden');
     }
@@ -848,6 +955,7 @@ function updateLocalNextReviewDate(wordObj, status) {
     const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
     const dd = String(nextDate.getDate()).padStart(2, '0');
     wordObj.nextReviewDate = `${yyyy}/${mm}/${dd}`;
+    wordObj.lastReview = new Date().toISOString(); 
 }
 
 async function checkAnswer() {
@@ -1015,10 +1123,11 @@ function renderBatchResults(aiResults) {
         const aiTagStr = `<span style="color:${aiResult ? 'green' : 'red'}; font-weight:bold;">${aiResult ? 'AI 判定正確' : 'AI 判定錯誤'}</span>`;
 
         const wordIndex = vocabData.indexOf(item.word);
+        const displayKana = item.word['假名拼音(分別)'] || item.word['假名拼音'] || ""; // ⭐ 修正為分別
 
         html += `
             <div class="card-box" onclick="showWordDetail(${wordIndex})" style="border: 2px solid ${boxColor}; margin-bottom: 10px; padding: 12px; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                <h4 style="margin: 0 0 8px 0; font-size: 18px;">${statusIcon} ${item.word['漢字']} (${item.word['假名拼音']})</h4>
+                <h4 style="margin: 0 0 8px 0; font-size: 18px;">${statusIcon} ${item.word['漢字']} (${displayKana})</h4>
                 <p style="margin: 3px 0; font-size: 14px; color: #555;">標準答案: ${item.word['中文意思']}</p>
                 <p style="margin: 3px 0; font-size: 14px; color: #007bff; font-weight: bold;">
                     你的輸入: ${item.userC} ${mode === 'both' ? ` (漢字: ${item.userK})` : ''}
@@ -1042,6 +1151,8 @@ function renderBatchResults(aiResults) {
 }
 
 batchFinishBtn.onclick = () => {
+    isMistakeMode = false;
+    updateMistakeBtn();
     stopAllAudio();
     quizSection.classList.add('hidden');
     batchResultsArea.classList.add('hidden'); 
@@ -1053,6 +1164,8 @@ batchFinishBtn.onclick = () => {
 homeBtn.onclick = () => { 
     processManualChoice();
     processHwChoices();
+    isMistakeMode = false;
+    updateMistakeBtn();
     stopAllAudio(); 
     quizSection.classList.add('hidden'); 
     batchResultsArea.classList.add('hidden'); 
@@ -1108,15 +1221,23 @@ window.undo = () => {
 };
 
 function syncToCloud(op, wordObj) {
+    const targetWord = wordObj || currentWord;
+    
+    // ⭐ 更新錯題本：答錯自動加入，答對/撤銷自動移除
+    if (op === "SUCCESS" || op === "UNDO") {
+        sessionMistakes.delete(targetWord);
+    } else if (op === "ERROR") {
+        sessionMistakes.add(targetWord);
+    }
+    updateMistakeBtn(); // 即時更新首頁的特訓按鈕狀態
+
     if (op === "SUCCESS" || op === "ERROR") {
-        sessionReviewCount++;
         updateStatsBar();
     }
     
     if (!logToggle.checked) return;
-    const targetWord = wordObj || currentWord;
     const wordId = (targetWord['漢字'] || '').trim() || (targetWord['假名拼音'] || '').trim();
-    const data = { timestamp: new Date().toLocaleString(), wordId: wordId, errorCount: targetWord.errorCount, level: targetWord.level, status: op };
+    const data = { timestamp: new Date().toISOString(), wordId: wordId, errorCount: targetWord.errorCount, level: targetWord.level, status: op };
     fetch(PROGRESS_API_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(data) });
 }
 
@@ -1139,7 +1260,10 @@ window.onload = () => {
     qType.dispatchEvent(new Event('change'));
 };
 
-startBtn.onclick = loadAndSyncData;
+startBtn.onclick = () => {
+    isMistakeMode = false; // 正常測驗模式
+    loadAndSyncData();
+};
 viewListBtn.onclick = showListView;
 submitBtn.onclick = checkAnswer;
 nextBtn.onclick = nextQuestion;

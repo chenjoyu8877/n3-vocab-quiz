@@ -23,7 +23,6 @@ body {
     align-self: flex-start;
 }
 
-/* ⭐ 關鍵隱藏類別，強制覆蓋 */
 .hidden { display: none !important; }
 
 /* =========================================
@@ -45,7 +44,7 @@ label {
     padding-left: 4px;
 }
 
-select, input[type="text"] {
+select, input[type="text"], input[type="password"] {
     width: 100%;
     padding: 14px;
     box-sizing: border-box;
@@ -57,7 +56,7 @@ select, input[type="text"] {
     background-color: #fff;
 }
 
-select:focus, input[type="text"]:focus {
+select:focus, input[type="text"]:focus, input[type="password"]:focus {
     border-color: #007bff;
     background-color: #fcfdfe;
     box-shadow: 0 0 0 4px rgba(0,123,255,0.1);
@@ -253,8 +252,8 @@ input:checked + .slider:before { transform: translateX(22px); }
 }
 .list-item button:active { transform: scale(0.85); }
 
-/* ⭐ 獨立化彈窗 (Modal) 的樣式 */
-#word-modal {
+/* ⭐ 共用彈窗 (Modal) 的樣式 */
+#word-modal, #round-modal {
     position: fixed;
     top: 0;
     left: 0;
@@ -285,7 +284,6 @@ input:checked + .slider:before { transform: translateX(22px); }
     to { opacity: 1; transform: scale(1); }
 }
 
-/* 打叉按鈕美化 */
 .close-btn {
     position: absolute;
     top: 10px;
@@ -395,7 +393,6 @@ button {
     .modal-card { width: 92%; padding: 20px; }
 }
 
-/* 捲軸美化 */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 10px; }

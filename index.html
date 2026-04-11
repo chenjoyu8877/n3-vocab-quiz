@@ -54,7 +54,7 @@
                     <span style="color: #007bff; font-weight: bold;">開啟 Gemini AI 語意批改 (限中文作答)</span>
                 </div>
                 <div id="ai-settings" class="hidden" style="margin-bottom: 15px;">
-                    <p style="font-size: 12px; color: #666; margin-bottom: 5px;">⚠️ 啟用後將強制進行 25 題測驗，結束後統一交由 AI 對答案。</p>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 5px;">⚠️ 啟用後將強制進行測驗，結束後統一交由 AI 對答案。</p>
                     <input type="password" id="gemini-api-key" placeholder="請輸入 Gemini API Key..." autocomplete="off">
                 </div>
                 
@@ -67,7 +67,7 @@
                 <button id="reset-data-btn" class="danger-btn">Sweep 🧹 重設所有單字進度 (歸零)</button>
             </div>
 
-            <button id="start-btn" class="primary-btn">開始測驗</button>
+            <button id="start-btn" class="primary-btn">開始今日 30 題特訓</button>
         </div>
 
         <div id="quiz-section" class="hidden">
@@ -159,6 +159,17 @@
     <div id="word-modal" class="hidden">
         <div class="modal-card">
             <div id="modal-content"></div>
+        </div>
+    </div>
+
+    <div id="round-modal" class="hidden">
+        <div class="modal-card" style="text-align: center;">
+            <h2 style="color: #28a745; margin-bottom: 10px;">🎉 恭喜！</h2>
+            <p style="color: #555; margin-bottom: 25px;">本日 30 個單字已全數過關！<br>你要重新挑戰這一輪，還是結束今日任務？</p>
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button onclick="restartRound()" class="primary-btn" style="margin:0;">🔄 重新進行這一輪 (不限次數)</button>
+                <button onclick="document.getElementById('home-btn').click(); document.getElementById('round-modal').classList.add('hidden');" class="secondary-btn">🏠 結束並回首頁</button>
+            </div>
         </div>
     </div>
 

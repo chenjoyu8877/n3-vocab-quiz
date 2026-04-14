@@ -34,7 +34,7 @@
                         <input type="checkbox" id="srs-toggle" checked>
                         <span class="slider"></span>
                     </label>
-                    <span style="font-weight: bold; color: #2c3e50;">啟用 SRS 智慧複習 (紀錄進度)</span>
+                    <span style="font-weight: bold; color: #2c3e50;">啟用 SRS 智慧複習 (同步雲端)</span>
                 </div>
                 <p style="font-size: 11px; color: #7f8c8d; margin-top: 0; margin-bottom: 15px; padding-left: 56px;">開啟: 每日30新字+舊字複習；關閉: 隨機全庫無盡抽題。</p>
 
@@ -56,7 +56,11 @@
                 </div>
 
                 <button id="view-list-btn" class="secondary-btn" style="background-color: #28a745; width: 100%; margin-bottom: 10px; color: white; border: none;">📖 瀏覽單字表</button>
-                <button id="reset-data-btn" class="danger-btn">Sweep 🧹 重設所有單字進度 (歸零)</button>
+                
+                <details style="margin-top: 15px; text-align: center; border-top: 1px solid #eee; padding-top: 15px;">
+                    <summary style="color: #dc3545; font-size: 13px; font-weight: bold; cursor: pointer; outline: none;">⚠️ 展開危險操作區 (重設進度)</summary>
+                    <button id="reset-data-btn" class="danger-btn">Sweep 🧹 重設所有單字進度 (歸零)</button>
+                </details>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
@@ -127,8 +131,16 @@
                 <input type="text" id="search-input" placeholder="🔍 搜尋漢字、假名或中文..." autocomplete="off">
             </div>
 
-            <div class="control-group" style="margin-top: 5px; text-align: left; display: flex; gap: 10px;">
-                <div style="flex: 1;">
+            <div class="control-group" style="margin-top: 5px; text-align: left; display: flex; gap: 8px; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 28%;">
+                    <label style="font-size: 12px; color: #666;">狀態：</label>
+                    <select id="status-filter" onchange="renderVocabList()">
+                        <option value="all">全部</option>
+                        <option value="tested">🟢 已背過</option>
+                        <option value="untested">⚪ 未測驗</option>
+                    </select>
+                </div>
+                <div style="flex: 1; min-width: 28%;">
                     <label style="font-size: 12px; color: #666;">大類：</label>
                     <select id="main-category-filter" onchange="updateSubCategories()">
                         <option value="all">全部</option>
@@ -140,13 +152,15 @@
                         <option value="其他">其他</option>
                     </select>
                 </div>
-                <div style="flex: 1;">
+                <div style="flex: 1; min-width: 28%;">
                     <label style="font-size: 12px; color: #666;">小類：</label>
                     <select id="pos-filter" onchange="renderVocabList()">
                         <option value="all">全部</option>
                     </select>
                 </div>
             </div>
+
+            <div id="vocab-count-display" style="font-size: 14px; color: #007bff; font-weight: bold; margin-bottom: 10px; text-align: left;"></div>
 
             <div id="vocab-list-container"></div>
         </div>

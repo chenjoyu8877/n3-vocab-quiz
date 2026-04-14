@@ -80,3 +80,5 @@ git push origin main
 git add . ; git commit -m "更新單字與修正" ; git push origin main
 
 git add . ; git commit -m "更新單字與音檔" ; git push origin main
+
+git add . ; git commit -m "修正" ; git push origin main

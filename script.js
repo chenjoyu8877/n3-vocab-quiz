@@ -1,16 +1,23 @@
 // ==========================================
-// ⭐ 全域參數設定區
+// ⭐ 1. 全域參數與 API 設定區 (請在此替換你的 Google Sheet API)
 // ==========================================
-const DAILY_LIMIT = 30;   // 每天鎖定背誦的單字量
+const PROGRESS_API_URL = "https://script.google.com/macros/s/AKfycby0LtDXQCqNxWYw43ENQZ3fvAKzEKXa89JbcfXYMte-0iL4h4UFzs6lZKMm1modsS6skw/exec"; 
+
+let DAILY_LIMIT = 30;     // 每天鎖定背誦的新單字量
 const AI_BATCH_SIZE = 10; // AI 模式每組抽題數
 const HW_BATCH_SIZE = 10; // 手寫練習每組抽題數
 
-// --- 1. DOM 元素宣告 ---
+// ==========================================
+// --- 以下為系統核心邏輯，不需修改 ---
+// ==========================================
+
+// --- DOM 元素宣告 ---
 const qType = document.getElementById('qType');
-const aType = document.getElementById('aType');
+const aTypeContainer = document.getElementById('aType-container');
 const srsToggle = document.getElementById('srs-toggle');
-const logToggle = document.getElementById('log-toggle');
 const startBtn = document.getElementById('start-btn');
+const startNewWordsBtn = document.getElementById('start-new-words-btn'); // 新增：新單字按鈕
+const startFreqBtn = document.getElementById('start-frequent-mistakes-btn');
 const resetDataBtn = document.getElementById('reset-data-btn');
 const homeBtn = document.getElementById('home-btn');
 const homeBtnList = document.getElementById('home-btn-list');
@@ -22,6 +29,7 @@ const playAudioBtn = document.getElementById('play-audio-btn');
 const inputArea = document.getElementById('input-area');
 
 const kanjiInput = document.getElementById('kanji-input');
+const kanaInput = document.getElementById('kana-input');
 const chineseInput = document.getElementById('chinese-input');
 const canvasArea = document.getElementById('canvas-area'); 
 const hwCanvas = document.getElementById('hw-canvas'); 
@@ -46,25 +54,31 @@ const batchResultsArea = document.getElementById('batch-results-area');
 const batchResultsContent = document.getElementById('batch-results-content');
 const batchFinishBtn = document.getElementById('batch-finish-btn');
 
-// --- 2. 全域變數與核心邏輯 ---
+// --- 全域變數與核心邏輯 ---
 const globalAudioPlayer = new Audio();
 let vocabData = [];
 let currentWord = {};
 let errorChartInstance = null; 
 let activeSentenceIdx = 1; 
-const PROGRESS_API_URL = "https://script.google.com/macros/s/AKfycby0LtDXQCqNxWYw43ENQZ3fvAKzEKXa89JbcfXYMte-0iL4h4UFzs6lZKMm1modsS6skw/exec"; 
 
 let lastEnterTime = 0;
 const ENTER_CD_MS = 600; 
 let audioSequenceId = 0; 
 
-// ⭐ 雲端同步無痕變數
-let dailyPool = [];         // 今日被選中的 30 個單字池 (每次載入動態計算)
-let roundPending = [];      // 這一輪還沒答對的單字池
+// ⭐ 雲端同步無痕與新舊單字變數
+let dailyNewWords = [];     // 專屬：今日 30 個新單字
+let dueOldWords = [];       // 專屬：今日該複習的舊單字
+let dailyPool = [];         // 綜合：新單字 + 舊複習
+let currentFullPool = [];   // 當前選定模式的「總目標池」
+let roundPending = [];      // 本輪還沒消滅的剩餘單字
 let hwChoices = {};           
 let currentManualChoice = null; 
-let sessionMistakes = new Set(); // 儲存錯題
+let sessionMistakes = new Set(); 
+
+// 狀態 Flags
 let isMistakeMode = false;       
+let isFrequentMistakeMode = false; 
+let isNewWordMode = false;
 
 let isBatchMode = false;
 let batchQuestions = [];
@@ -72,6 +86,9 @@ let batchAnswers = [];
 let currentBatchIdx = 0;
 let isHwBatchMode = false;
 let hwQuestions = [];
+
+let currentActiveQType = "";
+let currentActiveATypes = [];
 
 const categoryMap = {
     '名詞': ['名詞', '代名詞', '形式名詞'],
@@ -134,11 +151,6 @@ function stopAllAudio() {
     globalAudioPlayer.src = ""; 
 }
 
-function cleanForSpeech(text) {
-    if (!text) return "";
-    return text.replace(/[\(\（].*?[\)\）]/g, '').trim();
-}
-
 function renderErrorChart(cloudData = []) {
     const chartCanvas = document.getElementById('errorChart');
     if (!chartCanvas) return;
@@ -160,24 +172,61 @@ function renderErrorChart(cloudData = []) {
     });
 }
 
-const modeMap = {
-    'audio': [ { val: '中文意思', text: '回答中文' }, { val: '漢字', text: '回答漢字' }, { val: 'both', text: '回答漢字+中文' }, { val: 'flip', text: '翻頁模式' }, { val: 'handwriting', text: '批次手寫練習' } ],
-    '中文意思': [ { val: '假名拼音', text: '回答假名' }, { val: '漢字', text: '回答漢字' }, { val: 'flip', text: '翻頁模式' }, { val: 'handwriting', text: '批次手寫練習' } ],
-    '漢字': [ { val: '假名拼音', text: '回答假名' }, { val: '中文意思', text: '回答中文' }, { val: 'flip', text: '翻頁模式' }, { val: 'handwriting', text: '批次手寫練習' } ],
-    'sentence': [ { val: 'ans', text: '填空答題' } ]
-};
+function renderATypeOptions() {
+    let html = `<label class="chk-label hw-label"><input type="checkbox" id="hw-checkbox"> ✍️ 批次手寫模式</label><hr style="margin:10px 0; border:0; border-top:1px dashed #ccc;">`;
+    const val = qType.value;
+
+    if (val === 'mixed') {
+        html += `<div class="checkbox-group-title">請勾選要混合的題型 (至少兩項)：</div>`;
+        ['audio:聽力', '漢字:漢字', '中文意思:中文', 'sentence:句子填空'].forEach(item => {
+            const [k, v] = item.split(':');
+            html += `<label class="chk-label"><input type="checkbox" name="mixed-qtype" value="${k}" checked> ${v}</label>`;
+        });
+    } else {
+        let aTypes = [];
+        if (val === 'audio') aTypes = ['漢字', '假名拼音', '中文意思'];
+        else if (val === '漢字') aTypes = ['假名拼音', '中文意思'];
+        else if (val === '中文意思') aTypes = ['漢字', '假名拼音'];
+        else if (val === 'sentence') aTypes = ['漢字', '假名拼音'];
+
+        html += `<div class="checkbox-group-title">請勾選要作答的項目 (最少一項，最多全部)：</div>`;
+        aTypes.forEach(t => {
+            let label = t === '假名拼音' ? '拼音' : (t === '中文意思' ? '中文' : '漢字');
+            html += `<label class="chk-label"><input type="checkbox" name="atype-chk" value="${t}" checked> ${label}</label>`;
+        });
+    }
+    
+    aTypeContainer.innerHTML = html;
+
+    const hwChk = document.getElementById('hw-checkbox');
+    if (hwChk) {
+        hwChk.addEventListener('change', (e) => {
+            const chks = document.querySelectorAll('input[name="atype-chk"], input[name="mixed-qtype"]');
+            chks.forEach(c => {
+                c.disabled = e.target.checked;
+                if(e.target.checked) c.parentElement.style.opacity = 0.5;
+                else c.parentElement.style.opacity = 1;
+            });
+        });
+    }
+}
 
 qType.addEventListener('change', () => {
-    const opts = modeMap[qType.value] || [];
-    aType.innerHTML = opts.map(o => `<option value="${o.val}">${o.text}</option>`).join('');
+    renderATypeOptions();
+    localStorage.setItem('savedQType', qType.value);
 });
 
-// ⭐ 取得「學習日」(跨日為隔日 8:00 AM)
+
 function getStudyDate(dateInput) {
     let d = new Date(dateInput);
     if (isNaN(d.getTime())) return new Date(0); 
     d.setHours(d.getHours() - 8);
     return d;
+}
+
+function getTodayStudyString() {
+    const d = getStudyDate(new Date());
+    return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
 }
 
 function isTestedToday(wordObj) {
@@ -201,7 +250,8 @@ function isTestedToday(wordObj) {
 async function loadVocabCSV() {
     return new Promise((resolve) => {
         Papa.parse("vocab.csv", {
-            download: true, header: true,
+            download: true, 
+            header: true,
             complete: (results) => {
                 vocabData = results.data.filter(row => row['中文意思'] && (row['漢字'] || row['假名拼音']))
                     .map((item, index) => ({ 
@@ -217,100 +267,191 @@ async function loadVocabCSV() {
                         lastReview: "" 
                     }));
                 resolve();
+            },
+            error: (err) => {
+                console.error("CSV載入失敗:", err);
+                if (window.location.protocol === 'file:') {
+                    alert("⚠️ 嚴重錯誤：瀏覽器阻擋了讀取本地的 vocab.csv 檔案！\n\n因為安全限制，你不能直接點擊 html 檔案開啟。\n請使用 Live Server 或上傳到網頁伺服器（如 GitHub Pages）上運行！");
+                } else {
+                    alert("⚠️ 找不到 vocab.csv 檔案！請確定檔案與網頁放在同一個資料夾。");
+                }
+                resolve(); 
             }
         });
     });
 }
 
-// ⭐ 核心雲端抽題演算法 (完全無痕跨裝置同步)
+// ⭐ 升級版：分流「新單字」與「舊單字」的抽題演算法
 function initDailyPool() {
+    if (vocabData.length === 0) return;
+
     const todayStudy = getStudyDate(new Date()); 
     todayStudy.setHours(0, 0, 0, 0);
+    const todayStr = getTodayStudyString();
 
-    // 1. 抓出「今天已經有測驗紀錄」的單字 (來自雲端 lastReview)
-    let testedTodayWords = vocabData.filter(w => isTestedToday(w));
+    if (!srsToggle.checked) {
+        dailyNewWords = [];
+        dueOldWords = [];
+        dailyPool = [...vocabData];
+        currentFullPool = [...vocabData];
+        roundPending = [...vocabData];
+        return;
+    }
 
-    // 2. 抓出剩下的待測驗單字
-    let dueWords = vocabData.filter(w => {
-        if (isTestedToday(w)) return false; 
+    // --- 1. 處理今日 30 個「全新」單字 ---
+    let savedDate = localStorage.getItem('dailyNewDate');
+    let savedIds = JSON.parse(localStorage.getItem('dailyNewIds') || '[]');
+
+    if (savedDate !== todayStr) {
+        savedIds = []; // 跨日清空舊 ID
+    }
+
+    dailyNewWords = vocabData.filter(w => savedIds.includes(w.uniqueId));
+
+    if (dailyNewWords.length < DAILY_LIMIT) {
+        let needed = DAILY_LIMIT - dailyNewWords.length;
+        // 完全沒抽過的新單字
+        let availableNew = vocabData.filter(w => w.drawCount === 0 && !savedIds.includes(w.uniqueId));
+        
+        let toAdd = availableNew.slice(0, needed);
+        dailyNewWords = [...dailyNewWords, ...toAdd];
+        
+        savedIds = dailyNewWords.map(w => w.uniqueId);
+        localStorage.setItem('dailyNewIds', JSON.stringify(savedIds));
+        localStorage.setItem('dailyNewDate', todayStr);
+    }
+
+    // --- 2. 處理今日「該複習」的舊單字 ---
+    dueOldWords = vocabData.filter(w => {
+        if (w.drawCount === 0) return false; // 排除沒抽過的 (新字)
+        if (savedIds.includes(w.uniqueId)) return false; // 排除剛好在今日新單字名單的
+
         if (!w.nextReviewDate) return true; 
         const nd = new Date(w.nextReviewDate);
         nd.setHours(0, 0, 0, 0);
         return nd <= todayStudy;
     });
 
-    // 3. ⭐ 絕對決定性排序 (確保任何裝置排出的前 N 名都完全相同)
-    dueWords.sort((a, b) => {
-        if (a.level !== b.level) return a.level - b.level;
-        if (b.errorRate !== a.errorRate) return b.errorRate - a.errorRate;
-        return a.uniqueId.localeCompare(b.uniqueId); 
-    });
-
-    // 4. 計算補足 30 題的數量，並合併陣列
-    let neededCount = Math.max(0, DAILY_LIMIT - testedTodayWords.length);
-    dailyPool = [...testedTodayWords, ...dueWords.slice(0, neededCount)];
-
-    // 5. 初始化本輪待答陣列
-    roundPending = dailyPool.filter(w => {
-        if (!isTestedToday(w)) return true;
-        // 若今天已考過但錯了 (Lv0)，加入特訓
-        if (w.level === 0 && w.errorCount > 0) return true; 
-        return false;
-    });
+    // 綜合池 = 新單字 + 舊複習
+    dailyPool = [...dailyNewWords, ...dueOldWords];
 }
 
-// 核心同步模組
 async function ensureDataLoaded(btnElement) {
-    if (vocabData.length > 0) return; 
+    if (vocabData.length > 0) return true; 
     
     const originalText = btnElement.innerText;
     btnElement.innerText = "同步數據中...";
+    btnElement.disabled = true; 
     
-    await loadVocabCSV();
-    const cloudData = await refreshHomeStats();
-    
-    sessionMistakes.clear(); 
-    
-    if (cloudData) {
-        const map = new Map(cloudData.map(p => [p.wordId, p]));
-        vocabData.forEach(w => {
-            const p = map.get(w.uniqueId);
-            if (p) { 
-                w.errorCount = parseInt(p.errorCount) || 0; 
-                w.drawCount = parseInt(p.drawCount) || 0;
-                w.errorRate = parseFloat(p.errorRate) || 0;
-                w.firstReviewDate = p.firstReviewDate || "";
-                w.nextReviewDate = p.nextReviewDate || ""; 
-                w.level = parseInt(p.level) || 0; 
-                w.lastReview = p.lastReview || ""; 
-                
-                // 載入歷史錯題到特訓區
-                if (w.level === 0 && w.errorCount > 0) {
-                    sessionMistakes.add(w);
+    try {
+        await loadVocabCSV();
+        if (vocabData.length === 0) return false; 
+
+        const cloudData = await refreshHomeStats();
+        if (cloudData === null) {
+            alert("⚠️ 無法連線到 Google Sheet 資料庫！\n\n請確認你的 Apps Script 是：\n1. 執行身分設為「我(Me)」\n2. 誰可以存取設為「所有人(Anyone)」\n\n系統將暫時切換為「單機無存檔模式」運行。");
+        }
+        
+        sessionMistakes.clear(); 
+        
+        if (cloudData && Array.isArray(cloudData)) {
+            const map = new Map(cloudData.map(p => [p.wordId, p]));
+            vocabData.forEach(w => {
+                const p = map.get(w.uniqueId);
+                if (p) { 
+                    w.errorCount = parseInt(p.errorCount) || 0; 
+                    w.drawCount = parseInt(p.drawCount) || 0;
+                    w.errorRate = parseFloat(p.errorRate) || 0;
+                    w.firstReviewDate = p.firstReviewDate || "";
+                    w.nextReviewDate = p.nextReviewDate || ""; 
+                    w.level = parseInt(p.level) || 0; 
+                    w.lastReview = p.lastReview || ""; 
+                    
+                    if (w.level === 0 && w.errorCount > 0) {
+                        sessionMistakes.add(w);
+                    }
                 }
-            }
-        });
+            });
+        }
+        
+        initDailyPool(); 
+        updateMistakeBtn(); 
+        return true;
+
+    } catch (err) {
+        console.error("同步發生例外錯誤:", err);
+        alert("發生非預期的錯誤：" + err.message);
+        return false;
+    } finally {
+        btnElement.innerText = originalText;
+        btnElement.disabled = false;
     }
-    
-    initDailyPool(); 
-    updateMistakeBtn(); 
-    btnElement.innerText = originalText;
 }
 
-async function loadAndSyncData() {
-    await ensureDataLoaded(startBtn);
+// ⭐ 按鈕 1：啟動【專屬新單字】測驗
+startNewWordsBtn.onclick = async () => {
+    isMistakeMode = false;
+    isFrequentMistakeMode = false;
+    isNewWordMode = true;
     
-    if (!isMistakeMode) {
-        roundPending = [...dailyPool]; 
-        if (roundPending.length === 0) {
-            alert("🎉 今日任務已全數完成！太棒了！\n(如果想繼續，請直接按重新一輪)");
-            document.getElementById('round-modal').classList.remove('hidden');
-            return;
-        }
+    const isLoaded = await ensureDataLoaded(startNewWordsBtn);
+    if (!isLoaded) return; 
+    
+    currentFullPool = srsToggle.checked ? dailyNewWords : vocabData;
+    
+    roundPending = currentFullPool.filter(w => !isTestedToday(w) || (w.level === 0 && w.errorCount > 0));
+    
+    if (roundPending.length === 0) {
+        alert("🎉 今日「新單字」已全數完成！太棒了！\n(如果想繼續，請直接按重新一輪)");
+        document.getElementById('round-modal').classList.remove('hidden');
+        return;
     }
     
     startQuiz();
-}
+};
+
+// ⭐ 按鈕 2：啟動【綜合測驗 (新+舊)】
+startBtn.onclick = async () => {
+    isMistakeMode = false;
+    isFrequentMistakeMode = false;
+    isNewWordMode = false;
+    
+    const isLoaded = await ensureDataLoaded(startBtn);
+    if (!isLoaded) return; 
+    
+    currentFullPool = srsToggle.checked ? dailyPool : vocabData;
+    
+    roundPending = currentFullPool.filter(w => !isTestedToday(w) || (w.level === 0 && w.errorCount > 0));
+    
+    if (roundPending.length === 0) {
+        alert("🎉 今日「所有任務」已全數完成！太棒了！\n(如果想繼續，請直接按重新一輪)");
+        document.getElementById('round-modal').classList.remove('hidden');
+        return;
+    }
+    
+    startQuiz();
+};
+
+startFreqBtn.onclick = async () => {
+    isMistakeMode = false;
+    isFrequentMistakeMode = true;
+    isNewWordMode = false;
+    
+    const isLoaded = await ensureDataLoaded(startFreqBtn);
+    if (!isLoaded) return;
+
+    let mistakeWords = vocabData.filter(w => w.errorCount > 0 || w.errorRate > 0);
+    mistakeWords.sort((a,b) => b.errorRate - a.errorRate);
+    
+    if (mistakeWords.length === 0) {
+        alert("🎉 太強了！你的題庫裡沒有任何常錯單字！");
+        return;
+    }
+
+    currentFullPool = [...mistakeWords]; // 常錯模式全庫
+    roundPending = [...currentFullPool]; 
+    startQuiz();
+};
 
 function updateMistakeBtn() {
     let btn = document.getElementById('mistake-btn');
@@ -324,12 +465,17 @@ function updateMistakeBtn() {
         btn.style.fontWeight = 'bold';
         btn.onclick = () => {
             isMistakeMode = true;
-            loadAndSyncData();
+            isFrequentMistakeMode = false;
+            isNewWordMode = false;
+            
+            currentFullPool = Array.from(sessionMistakes);
+            roundPending = [...currentFullPool];
+            startQuiz();
         };
         document.getElementById('setup-section').appendChild(btn);
     }
     if (sessionMistakes.size > 0) {
-        btn.innerHTML = `🔥 錯題特訓 (${sessionMistakes.size} 題待消滅)`;
+        btn.innerHTML = `🔥 剛錯的單字特訓 (${sessionMistakes.size} 題待消滅)`;
         btn.classList.remove('hidden');
     } else {
         btn.classList.add('hidden');
@@ -347,17 +493,24 @@ function updateStatsBar() {
         headerRow.parentNode.insertBefore(bar, headerRow.nextSibling); 
     }
     
-    const totalDaily = dailyPool.length;
+    // 動態根據當前模式計算數據
+    const totalDaily = currentFullPool.length;
     const pendingRound = roundPending.length;
     const masteredRound = totalDaily - pendingRound;
     
-    let modeText = isMistakeMode ? `<span style="color:#ff4d4f;">🔥 錯題特訓中</span>` : `<span>📚 今日目標: ${totalDaily}</span>`;
-    bar.innerHTML = `${modeText} <span style="color:#d9534f;">⏳ 本輪剩餘: ${pendingRound}</span> <span style="color:#28a745;">🎯 本輪消滅: ${masteredRound}</span>`;
+    let modeText = `<span>📚 綜合測驗</span>`;
+    if (isNewWordMode) modeText = `<span style="color:#20c997;">🆕 今日新單字</span>`;
+    if (isMistakeMode) modeText = `<span style="color:#ff4d4f;">🔥 剛錯的單字特訓</span>`;
+    if (isFrequentMistakeMode) modeText = `<span style="color:#6c757d;">💀 歷史死穴特訓</span>`;
+    if (!srsToggle.checked && !isMistakeMode && !isFrequentMistakeMode && !isNewWordMode) modeText = `<span>♾️ 無盡全庫抽題</span>`;
+
+    bar.innerHTML = `${modeText} <span style="color:#d9534f;">⏳ 待消滅: ${pendingRound}/${totalDaily}</span> <span style="color:#28a745;">🎯 已消滅: ${masteredRound}</span>`;
 }
 
-// --- 5. 單字列表渲染 ---
 async function showListView() {
-    await ensureDataLoaded(viewListBtn); 
+    const isLoaded = await ensureDataLoaded(viewListBtn); 
+    if (!isLoaded) return;
+    
     mainCategoryFilter.value = 'all';
     searchInput.value = ''; 
     updateSubCategories(); 
@@ -543,51 +696,53 @@ function startQuiz() {
 
     updateStatsBar(); 
 
-    let dueWords = [];
+    if (roundPending.length === 0) {
+        document.getElementById('round-modal').classList.remove('hidden');
+        return;
+    }
 
-    if (isMistakeMode) {
-        dueWords = Array.from(sessionMistakes);
-        if (dueWords.length === 0) {
-            alert("✅ 錯題已全數消滅！太棒了！");
-            isMistakeMode = false;
-            updateMistakeBtn();
-            homeBtn.click();
+    let selectedQType = qType.value;
+    const hwChk = document.getElementById('hw-checkbox');
+    isHwBatchMode = hwChk && hwChk.checked;
+    
+    let selectedATypes = [];
+    if (selectedQType === 'mixed') {
+        selectedATypes = Array.from(document.querySelectorAll('input[name="mixed-qtype"]:checked')).map(el => el.value);
+        if (selectedATypes.length < 2) {
+            alert("⚠️ 混合大亂鬥模式請至少勾選「兩項」要測驗的題型！");
             return;
         }
-    } else {
-        dueWords = [...roundPending];
-        if (dueWords.length === 0) {
-            document.getElementById('round-modal').classList.remove('hidden');
+    } else if (!isHwBatchMode) {
+        selectedATypes = Array.from(document.querySelectorAll('input[name="atype-chk"]:checked')).map(el => el.value);
+        if (selectedATypes.length === 0) {
+            alert("⚠️ 請至少勾選一項要作答的項目！");
             return;
         }
     }
 
     // --- AI 模式 ---
-    if (aiToggle.checked) {
+    if (aiToggle.checked && !isHwBatchMode) {
         const apiKey = geminiApiKeyInput.value.trim();
         if (!apiKey) { alert("請先輸入 Gemini API Key！"); return; }
         localStorage.setItem('geminiApiKey', apiKey); 
-
-        const mode = aType.value;
-        if (mode !== '中文意思' && mode !== 'both') { alert("AI 批改模式僅支援中文作答！"); return; }
         
+        if (selectedQType !== 'mixed' && !selectedATypes.includes('中文意思')) {
+            alert("⚠️ AI 語意批改需要勾選「中文意思」作答項目才能運作！");
+            return;
+        }
+
         isBatchMode = true;
-        isHwBatchMode = false;
         batchAnswers = []; 
         currentBatchIdx = 0;
-
-        batchQuestions = getBatchWords(dueWords, Math.min(AI_BATCH_SIZE, dueWords.length));
+        batchQuestions = getBatchWords(roundPending, Math.min(AI_BATCH_SIZE, roundPending.length));
     } 
     // --- 批次手寫練習模式 ---
-    else if (aType.value === 'handwriting') {
-        isHwBatchMode = true;
+    else if (isHwBatchMode) {
         isBatchMode = false;
-        hwQuestions = getBatchWords(dueWords, Math.min(HW_BATCH_SIZE, dueWords.length));
-        
+        hwQuestions = getBatchWords(roundPending, Math.min(HW_BATCH_SIZE, roundPending.length));
         setupSection.classList.add('hidden'); 
         batchResultsArea.classList.add('hidden');
         quizSection.classList.remove('hidden'); 
-        
         renderHwBatch(); 
         return; 
     } 
@@ -606,11 +761,10 @@ function startQuiz() {
 
 window.restartRound = () => {
     document.getElementById('round-modal').classList.add('hidden');
-    roundPending = [...dailyPool]; // 重置為完整的 30 題
+    roundPending = [...currentFullPool]; // 重置為對應模式的總池
     startQuiz();
 };
 
-// ⭐ 錯誤率加權抽題演算法
 function getWeightedRandomWord(pool) {
     let totalWeight = 0;
     let weights = pool.map(w => {
@@ -645,27 +799,79 @@ function getNextWord() {
         return batchQuestions[currentBatchIdx];
     }
 
-    let dueWords = [];
-    if (isMistakeMode) {
-        dueWords = Array.from(sessionMistakes);
-        if (dueWords.length === 0) {
-            alert("✅ 錯題已全數消滅！太棒了！");
-            isMistakeMode = false;
-            updateMistakeBtn();
-            homeBtn.click();
-            return null;
-        }
-    } else {
-        dueWords = [...roundPending];
-        if (dueWords.length === 0) {
-            document.getElementById('round-modal').classList.remove('hidden');
-            return null;
-        }
+    if (roundPending.length === 0) {
+        document.getElementById('round-modal').classList.remove('hidden');
+        return null;
     }
 
-    return getWeightedRandomWord(dueWords);
+    return getWeightedRandomWord(roundPending);
 }
 
+// ⭐ 動態產生每題的 UI
+function nextQuestion() {
+    processManualChoice(); 
+    stopAllAudio();
+    updateStatsBar(); 
+    feedback.innerHTML = ''; kanjiInput.value = ''; kanaInput.value = ''; chineseInput.value = ''; 
+    nextBtn.classList.add('hidden'); clearCanvas();
+    
+    currentWord = getNextWord();
+    if (!currentWord) return;
+
+    playAudioBtn.classList.add('hidden'); inputArea.classList.add('hidden');
+    canvasArea.classList.add('hidden'); flashcardArea.classList.add('hidden');
+
+    currentActiveQType = qType.value;
+    
+    if (currentActiveQType === 'mixed') {
+        const mixQTypes = Array.from(document.querySelectorAll('input[name="mixed-qtype"]:checked')).map(el => el.value);
+        currentActiveQType = mixQTypes[Math.floor(Math.random() * mixQTypes.length)];
+        
+        if (currentActiveQType === 'audio') currentActiveATypes = [['漢字'], ['假名拼音'], ['中文意思']][Math.floor(Math.random()*3)];
+        else if (currentActiveQType === '漢字') currentActiveATypes = [['假名拼音'], ['中文意思']][Math.floor(Math.random()*2)];
+        else if (currentActiveQType === '中文意思') currentActiveATypes = [['漢字'], ['假名拼音']][Math.floor(Math.random()*2)];
+        else if (currentActiveQType === 'sentence') currentActiveATypes = [['漢字'], ['假名拼音']][Math.floor(Math.random()*2)];
+    } else {
+        currentActiveATypes = Array.from(document.querySelectorAll('input[name="atype-chk"]:checked')).map(el => el.value);
+    }
+
+    let qName = currentActiveQType === 'audio' ? '聽力' : (currentActiveQType === 'sentence' ? '句子填空' : currentActiveQType);
+    let hintLabels = currentActiveATypes.map(t => t==='假名拼音'?'拼音':(t==='中文意思'?'中文':'漢字')).join(' + ');
+    
+    let hintText = `[${qName}] 答題：<span style="color:#007bff">${hintLabels}</span> | 重音：${currentWord['重音'] || '-'}`;
+    if (isBatchMode) hintText += ` | <strong style="color:red;">AI 模式: 第 ${currentBatchIdx + 1}/${batchQuestions.length} 題</strong>`;
+    hintDisplay.innerHTML = hintText;
+
+    inputArea.classList.remove('hidden');
+    kanjiInput.classList.add('hidden');
+    kanaInput.classList.add('hidden');
+    chineseInput.classList.add('hidden');
+
+    if (currentActiveATypes.includes('漢字')) kanjiInput.classList.remove('hidden');
+    if (currentActiveATypes.includes('假名拼音')) kanaInput.classList.remove('hidden');
+    if (currentActiveATypes.includes('中文意思')) chineseInput.classList.remove('hidden');
+
+    setTimeout(() => {
+        if (!kanjiInput.classList.contains('hidden')) kanjiInput.focus();
+        else if (!kanaInput.classList.contains('hidden')) kanaInput.focus();
+        else if (!chineseInput.classList.contains('hidden')) chineseInput.focus();
+    }, 50);
+
+    if (currentActiveQType === 'sentence') {
+        activeSentenceIdx = (Math.random() < 0.5 && currentWord['常用例句 2題目']) ? 2 : 1;
+        const cnTrans = currentWord[`常用例句 ${activeSentenceIdx}中`];
+        const sentenceQ = currentWord[`常用例句 ${activeSentenceIdx}題目`];
+        questionDisplay.innerHTML = `<div style="font-size:18px; color:#666; margin-bottom:10px;">${cnTrans}</div><div>${sentenceQ}</div>`;
+    } else if (currentActiveQType === 'audio') {
+        questionDisplay.innerText = "🎧 聽力測驗 (聽音拼寫)";
+        playAudioBtn.classList.remove('hidden');
+        playFullSequence(); 
+    } else if (currentActiveQType === '中文意思') {
+        questionDisplay.innerHTML = `${currentWord['中文意思']} <span style="font-size:18px; color:#e67e22;">[${currentWord['詞性']}]</span>`;
+    } else if (currentActiveQType === '漢字') {
+        questionDisplay.innerText = currentWord['漢字'] || currentWord['假名拼音'];
+    } 
+}
 
 window.playBatchAudio = (idx, type = 'word') => {
     const w = hwQuestions[idx];
@@ -696,9 +902,15 @@ function renderHwBatch() {
     `;
 
     hwQuestions.forEach((w, idx) => {
+        let currentQType = qType.value;
+        if (currentQType === 'mixed') {
+            const mixQTypes = Array.from(document.querySelectorAll('input[name="mixed-qtype"]:checked')).map(el => el.value);
+            currentQType = mixQTypes[Math.floor(Math.random() * mixQTypes.length)];
+        }
+
         let qText = "";
         
-        if (qType.value === 'audio') {
+        if (currentQType === 'audio') {
             let audioBtns = `<button onclick="playBatchAudio(${idx}, 'word')" class="secondary-btn" style="padding:6px 12px; margin-right:5px; margin-bottom:5px;">🔊 聽單字</button>`;
             if (w['常用例句 1日']) {
                 audioBtns += `<button onclick="playBatchAudio(${idx}, '1')" class="secondary-btn" style="padding:6px 12px; margin-right:5px; margin-bottom:5px;">🔊 聽例句 1</button>`;
@@ -708,13 +920,13 @@ function renderHwBatch() {
             }
             qText = `<div style="display:inline-block;">${audioBtns}</div> <span style="color:#e67e22; font-size:14px; font-weight:normal;">[${w['詞性']}]</span>`;
         } 
-        else if (qType.value === '中文意思') {
+        else if (currentQType === '中文意思') {
             qText = `${w['中文意思']} <span style="color:#e67e22; font-size:14px; font-weight:normal;">[${w['詞性']}]</span>`;
-        } else if (qType.value === 'sentence') {
+        } else if (currentQType === 'sentence') {
             const sIdx = (Math.random() < 0.5 && w['常用例句 2題目']) ? 2 : 1;
             qText = `<div style="font-size:14px; color:#666; font-weight:normal;">${w[`常用例句 ${sIdx}中`]}</div><div>${w[`常用例句 ${sIdx}題目`]}</div>`;
         } else {
-            qText = w[qType.value] || "未知題目";
+            qText = w['漢字'] || w['假名拼音'];
         }
 
         const wordIdx = vocabData.findIndex(vw => vw.uniqueId === w.uniqueId);
@@ -795,66 +1007,6 @@ window.nextHwBatch = () => {
     startQuiz(); 
 };
 
-
-function nextQuestion() {
-    processManualChoice(); 
-    stopAllAudio();
-    updateStatsBar(); 
-    feedback.innerHTML = ''; kanjiInput.value = ''; chineseInput.value = ''; 
-    nextBtn.classList.add('hidden'); clearCanvas();
-    
-    currentWord = getNextWord();
-    if (!currentWord) return;
-
-    playAudioBtn.classList.add('hidden'); inputArea.classList.add('hidden');
-    canvasArea.classList.add('hidden'); flashcardArea.classList.add('hidden');
-
-    const currentModeName = aType.options[aType.selectedIndex].text;
-    let hintText = `模式：<span style="color:#007bff">${currentModeName}</span> | 重音：${currentWord['重音'] || '-'}`;
-    
-    if (isBatchMode) {
-        hintText += ` | <strong style="color:red;">AI 模式: 第 ${currentBatchIdx + 1}/${batchQuestions.length} 題</strong>`;
-    }
-    hintDisplay.innerHTML = hintText;
-
-    if (qType.value === 'sentence') {
-        activeSentenceIdx = (Math.random() < 0.5 && currentWord['常用例句 2題目']) ? 2 : 1;
-        const cnTrans = currentWord[`常用例句 ${activeSentenceIdx}中`];
-        const sentenceQ = currentWord[`常用例句 ${activeSentenceIdx}題目`];
-        questionDisplay.innerHTML = `<div style="font-size:18px; color:#666; margin-bottom:10px;">${cnTrans}</div><div>${sentenceQ}</div>`;
-        inputArea.classList.remove('hidden'); kanjiInput.classList.add('hidden'); chineseInput.classList.remove('hidden');
-        setTimeout(() => chineseInput.focus(), 50);
-    } else {
-        if (aType.value === 'flip') flashcardArea.classList.remove('hidden');
-        else if (aType.value === 'handwriting') {
-            // 已攔截
-        } else {
-            inputArea.classList.remove('hidden');
-            if (aType.value === 'both') {
-                kanjiInput.classList.remove('hidden'); chineseInput.classList.remove('hidden');
-                setTimeout(() => kanjiInput.focus(), 50);
-            } else if (aType.value === '中文意思') {
-                kanjiInput.classList.add('hidden'); chineseInput.classList.remove('hidden');
-                setTimeout(() => chineseInput.focus(), 50);
-            } else {
-                kanjiInput.classList.remove('hidden'); chineseInput.classList.add('hidden');
-                setTimeout(() => kanjiInput.focus(), 50);
-            }
-        }
-
-        if (qType.value === 'audio') {
-            questionDisplay.innerText = "🎧 聽力測驗 (點擊卡片看答案)";
-            playAudioBtn.classList.remove('hidden');
-            playFullSequence(); 
-        } 
-        else if (qType.value === '中文意思') {
-            questionDisplay.innerHTML = `${currentWord[qType.value]} <span style="font-size:18px; color:#e67e22;">[${currentWord['詞性']}]</span>`;
-        } else {
-            questionDisplay.innerText = currentWord[qType.value];
-        }
-    }
-}
-
 async function playFullSequence() {
     const currentId = audioSequenceId; 
     if (audioSequenceId !== currentId) return; 
@@ -910,27 +1062,13 @@ window.manualResultUI = (isCorrect) => {
     nextBtn.classList.remove('hidden'); 
 };
 
-function showFullCard(isCorrect, userAnswer = "") {
-    const isManual = (aType.value === 'flip');
-    const trackingDisabled = !srsToggle.checked && !logToggle.checked; 
-
+function showFullCard(isCorrect, userDisplayArr = []) {
     let headerHTML = "";
 
-    if (isManual) {
-        if (trackingDisabled) {
-            headerHTML = `<h3 style="color:#007bff; margin-bottom:15px;">💡 單字解答</h3>`;
-        } else {
-            headerHTML = `
-                <div id="manual-controls" style="margin-bottom:15px; background:#fff3cd; padding:12px; border-radius:10px; border:1px solid #ffeeba;">
-                    <p style="font-weight:bold; margin-bottom:10px; color:#856404;">請判定您的回答：</p>
-                    <div style="display:flex; gap:10px;">
-                        <button id="manual-btn-true" onclick="manualResultUI(true)" style="background:#e8f5e9; color:#28a745; border: 2px solid #28a745; flex:1; padding:12px; border-radius:8px; font-weight:bold; transition:all 0.2s;">✅ 我對了</button>
-                        <button id="manual-btn-false" onclick="manualResultUI(false)" style="background:#fdeeed; color:#dc3545; border: 2px solid #dc3545; flex:1; padding:12px; border-radius:8px; font-weight:bold; transition:all 0.2s;">❌ 我錯了</button>
-                    </div>
-                </div>`;
-        }
+    if (isCorrect) {
+        headerHTML = `<h3 style="color:green;">✅ 正確！</h3>`;
     } else {
-        headerHTML = isCorrect ? `<h3 style="color:green;">✅ 正確！</h3>` : `<h3 style="color:red;">❌ 答錯了！</h3><p><small>您的輸入：${userAnswer}</small></p><button onclick="undo()" id="undo-btn">🔧 手誤取消懲罰</button>`;
+        headerHTML = `<h3 style="color:red;">❌ 答錯了！</h3><p><small>您的輸入：${userDisplayArr.join(' / ')}</small></p><button onclick="undo()" id="undo-btn">🔧 手誤取消懲罰</button>`;
     }
 
     const wordIdx = vocabData.indexOf(currentWord);
@@ -952,9 +1090,7 @@ function showFullCard(isCorrect, userAnswer = "") {
         </div>
     `;
     
-    if (!isManual || trackingDisabled) {
-        nextBtn.classList.remove('hidden');
-    }
+    nextBtn.classList.remove('hidden');
 }
 
 function updateLocalNextReviewDate(wordObj, status) {
@@ -975,8 +1111,8 @@ function updateLocalNextReviewDate(wordObj, status) {
     wordObj.lastReview = new Date().toISOString(); 
 }
 
+// ⭐ 多輸入框驗證核心
 async function checkAnswer() {
-    const mode = aType.value;
     inputArea.classList.add('hidden');
 
     if (isBatchMode) {
@@ -986,43 +1122,43 @@ async function checkAnswer() {
             userK: kanjiInput.value.trim()
         });
         currentBatchIdx++;
-        
-        if (currentBatchIdx < batchQuestions.length) {
-            nextQuestion();
-        } else {
-            await processBatchResults(); 
-        }
+        if (currentBatchIdx < batchQuestions.length) nextQuestion();
+        else await processBatchResults(); 
         return;
     }
 
-    if (mode === 'flip') {
-        showFullCard(null);
-    } else {
-        let isCorrect = false;
-        let userDisplay = "";
-        let userVal = ""; 
+    let isCorrect = true;
+    let userDisplayArr = [];
 
-        if (mode === 'both') {
-            const userK = kanjiInput.value.trim(); const userC = chineseInput.value.trim();
-            userDisplay = `${userK} / ${userC}`;
-            const kPoss = (currentWord['漢字'] || "").split('/').map(s => s.trim().toLowerCase());
-            const cPoss = (currentWord['中文意思'] || "").split('/').map(s => s.trim().toLowerCase());
-            isCorrect = kPoss.includes(userK.toLowerCase()) && cPoss.includes(userC.toLowerCase());
-        } else {
-            if (mode === 'ans' || mode === '中文意思' || qType.value === 'sentence') {
-                userVal = chineseInput.value.trim();
-            } else {
-                userVal = kanjiInput.value.trim();
-            }
-            
-            userDisplay = userVal;
-            let correctRaw = (qType.value === 'sentence') ? currentWord[`常用例句 ${activeSentenceIdx}答案`] : currentWord[mode];
-            isCorrect = (correctRaw || "").toLowerCase().split('/').map(s => s.trim()).some(p => userVal.toLowerCase() === p);
-        }
-
-        commitWordResult(currentWord, isCorrect);
-        showFullCard(isCorrect, userDisplay); 
+    if (currentActiveATypes.includes('漢字')) {
+        const uK = kanjiInput.value.trim().toLowerCase();
+        userDisplayArr.push(uK || "(未填)");
+        const kPoss = (currentWord['漢字'] || currentWord['假名拼音'] || "").split('/').map(s => s.trim().toLowerCase());
+        if (!kPoss.includes(uK)) isCorrect = false;
     }
+    
+    if (currentActiveATypes.includes('假名拼音')) {
+        const uKa = kanaInput.value.trim().toLowerCase();
+        userDisplayArr.push(uKa || "(未填)");
+        const kaPoss = (currentWord['假名拼音'] || "").split('/').map(s => s.trim().toLowerCase());
+        
+        if (currentActiveQType === 'sentence') {
+            const ansPoss = (currentWord[`常用例句 ${activeSentenceIdx}答案`] || "").split('/').map(s=>s.trim().toLowerCase());
+            if (!ansPoss.includes(uKa) && !kaPoss.includes(uKa)) isCorrect = false;
+        } else {
+            if (!kaPoss.includes(uKa)) isCorrect = false;
+        }
+    }
+
+    if (currentActiveATypes.includes('中文意思')) {
+        const uC = chineseInput.value.trim().toLowerCase();
+        userDisplayArr.push(uC || "(未填)");
+        const cPoss = (currentWord['中文意思'] || "").split('/').map(s => s.trim().toLowerCase());
+        if (!cPoss.includes(uC)) isCorrect = false;
+    }
+
+    commitWordResult(currentWord, isCorrect);
+    showFullCard(isCorrect, userDisplayArr); 
 }
 
 window.processBatchResults = async () => {
@@ -1105,30 +1241,27 @@ function renderBatchResults(aiResults) {
     batchAnswers.forEach((item, idx) => {
         const aiResult = aiResults[idx] === "正確";
         let finalCorrect = aiResult;
-        const mode = aType.value;
 
-        let kanjiOk = true;
-        if (mode === 'both') {
+        if (currentActiveATypes.includes('漢字')) {
             const kPoss = (item.word['漢字'] || "").split('/').map(s => s.trim().toLowerCase());
-            kanjiOk = kPoss.includes(item.userK.toLowerCase());
-            finalCorrect = aiResult && kanjiOk;
+            if (!kPoss.includes(item.userK.toLowerCase())) finalCorrect = false;
         }
 
         commitWordResult(item.word, finalCorrect);
 
         const statusIcon = finalCorrect ? "✅" : "❌";
         const boxColor = finalCorrect ? '#c3e6cb' : '#f5c6cb';
-        const aiTagStr = `<span style="color:${aiResult ? 'green' : 'red'}; font-weight:bold;">${aiResult ? 'AI 判定正確' : 'AI 判定錯誤'}</span>`;
+        const aiTagStr = `<span style="color:${aiResult ? 'green' : 'red'}; font-weight:bold;">${aiResult ? 'AI 中文判定正確' : 'AI 中文判定錯誤'}</span>`;
 
         const wordIndex = vocabData.indexOf(item.word);
         const displayKana = item.word['假名拼音(分別)'] || item.word['假名拼音'] || ""; 
 
         html += `
-            <div class="card-box" onclick="showWordDetail(${wordIndex})" style="border: 2px solid ${boxColor}; margin-bottom: 10px; padding: 12px; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+            <div class="card-box" onclick="showWordDetail(${wordIndex})" style="border: 2px solid ${boxColor}; margin-bottom: 10px; padding: 12px; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'" >
                 <h4 style="margin: 0 0 8px 0; font-size: 18px;">${statusIcon} ${item.word['漢字']} (${displayKana})</h4>
                 <p style="margin: 3px 0; font-size: 14px; color: #555;">標準答案: ${item.word['中文意思']}</p>
                 <p style="margin: 3px 0; font-size: 14px; color: #007bff; font-weight: bold;">
-                    你的輸入: ${item.userC} ${mode === 'both' ? ` (漢字: ${item.userK})` : ''}
+                    你的輸入: ${item.userC} ${currentActiveATypes.includes('漢字') ? ` (漢字: ${item.userK})` : ''}
                 </p>
                 <div style="margin-top: 5px; font-size: 13px; background: #f8f9fa; padding: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
                     ${aiTagStr}
@@ -1155,7 +1288,6 @@ batchFinishBtn.onclick = () => {
     quizSection.classList.add('hidden');
     batchResultsArea.classList.add('hidden'); 
     setupSection.classList.remove('hidden');
-    startBtn.innerText = "開始今日 30 題特訓";
     refreshHomeStats();
 };
 
@@ -1168,7 +1300,6 @@ homeBtn.onclick = () => {
     quizSection.classList.add('hidden'); 
     batchResultsArea.classList.add('hidden'); 
     setupSection.classList.remove('hidden'); 
-    startBtn.innerText = "開始今日 30 題特訓"; 
     refreshHomeStats(); 
 };
 
@@ -1179,12 +1310,13 @@ function handleEnter(e) {
     lastEnterTime = now;
     if (!nextBtn.classList.contains('hidden')) { nextQuestion(); } 
     else if (feedback.innerHTML === "" && !isHwBatchMode) {
-        if (document.activeElement === kanjiInput && aType.value === 'both') { chineseInput.focus(); } 
-        else { checkAnswer(); }
+        if (document.activeElement === kanjiInput && !kanaInput.classList.contains('hidden')) kanaInput.focus();
+        else if ((document.activeElement === kanjiInput || document.activeElement === kanaInput) && !chineseInput.classList.contains('hidden')) chineseInput.focus();
+        else checkAnswer(); 
     }
 }
 
-[kanjiInput, chineseInput].forEach(el => {
+[kanjiInput, kanaInput, chineseInput].forEach(el => {
     el.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') { e.preventDefault(); e.stopImmediatePropagation(); handleEnter(e); }
     });
@@ -1192,7 +1324,7 @@ function handleEnter(e) {
 
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !quizSection.classList.contains('hidden')) {
-        if (document.activeElement === kanjiInput || document.activeElement === chineseInput) return;
+        if (document.activeElement === kanjiInput || document.activeElement === kanaInput || document.activeElement === chineseInput) return;
         e.preventDefault(); handleEnter(e);
     }
 }, true); 
@@ -1204,10 +1336,16 @@ async function refreshHomeStats() {
     if (logToggle.checked) {
         try {
             const res = await fetch(PROGRESS_API_URL);
-            if (res.ok) { const cloudData = await res.json(); renderErrorChart(cloudData); return cloudData; }
-        } catch (e) { console.warn("同步失敗", e); }
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const cloudData = await res.json(); 
+            renderErrorChart(cloudData); 
+            return cloudData; 
+        } catch (e) { 
+            console.error("同步失敗", e); 
+            return null; 
+        }
     }
-    return null;
+    return []; 
 }
 
 window.undo = () => {
@@ -1215,7 +1353,6 @@ window.undo = () => {
     currentWord.level += 2; 
     updateLocalNextReviewDate(currentWord, "UNDO");
     
-    // 反轉撤銷：把單字放回待答區
     roundPending.push(currentWord);
     
     currentWord.errorRate = currentWord.drawCount > 0 ? (currentWord.errorCount / currentWord.drawCount) : 0;
@@ -1260,12 +1397,12 @@ window.onload = () => {
     if (savedKey) {
         geminiApiKeyInput.value = savedKey;
     }
+    
+    const savedQType = localStorage.getItem('savedQType');
+    if (savedQType) qType.value = savedQType;
+    qType.dispatchEvent(new Event('change'));
 };
 
-startBtn.onclick = () => {
-    isMistakeMode = false;
-    loadAndSyncData();
-};
 viewListBtn.onclick = showListView;
 submitBtn.onclick = checkAnswer;
 nextBtn.onclick = nextQuestion;
@@ -1273,7 +1410,7 @@ playAudioBtn.onclick = () => playFullSequence();
 homeBtnList.onclick = () => { stopAllAudio(); listSection.classList.add('hidden'); setupSection.classList.remove('hidden'); };
 mainCategoryFilter.onchange = updateSubCategories;
 posFilter.onchange = renderVocabList;
-resetDataBtn.onclick = () => { if (confirm("⚠️ 確定要重設進度嗎？")) { vocabData.forEach(w => { w.level = 0; w.errorCount = 0; w.nextReviewDate = ""; }); if (logToggle.checked) fetch(PROGRESS_API_URL, { method: "POST", mode: "no-cors", body: JSON.stringify({ status: "RESET_ALL" }) }).then(() => location.reload()); } };
+resetDataBtn.onclick = () => { if (confirm("⚠️ 確定要重設進度嗎？")) { fetch(PROGRESS_API_URL, { method: "POST", mode: "no-cors", body: JSON.stringify({ status: "RESET_ALL" }) }).then(() => location.reload()); } };
 
 window.onclick = (event) => { 
     if (event.target == wordModal || event.target == document.getElementById('round-modal')) {

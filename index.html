@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N3 單字高手 Pro - AI 語意強化版</title>
+    <title>N3 單字高手 Pro - 終極自訂版</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -17,44 +17,36 @@
             <div class="control-group">
                 <label for="qType">出題形式：</label>
                 <select id="qType">
-                    <option value="sentence">例句填空模式</option>
                     <option value="audio">聽力出題 (Audio)</option>
-                    <option value="中文意思">中文意思出題</option>
                     <option value="漢字">漢字出題</option>
+                    <option value="中文意思">中文意思出題</option>
+                    <option value="sentence">例句填空模式</option>
+                    <option value="mixed" style="color: #ea580c; font-weight: bold;">🌪️ 混合考題大亂鬥</option>
                 </select>
             </div>
 
-            <div class="control-group">
-                <label for="aType">答題形式：</label>
-                <select id="aType">
-                    </select>
-            </div>
+            <div class="control-group" id="aType-container" style="background: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #e1e8ed;">
+                </div>
 
             <div class="advanced-settings">
-                <div class="toggle-group">
+                <div class="toggle-group" style="margin-bottom: 5px;">
                     <label class="switch">
                         <input type="checkbox" id="srs-toggle" checked>
                         <span class="slider"></span>
                     </label>
-                    <span>開啟遺忘曲線模式 (SRS)</span>
+                    <span style="font-weight: bold; color: #2c3e50;">啟用 SRS 智慧複習 (紀錄進度)</span>
                 </div>
-                <div class="toggle-group">
-                    <label class="switch">
-                        <input type="checkbox" id="log-toggle" checked>
-                        <span class="slider"></span>
-                    </label>
-                    <span>同步學習進度至雲端</span>
-                </div>
+                <p style="font-size: 11px; color: #7f8c8d; margin-top: 0; margin-bottom: 15px; padding-left: 56px;">開啟: 每日30新字+舊字複習；關閉: 隨機全庫無盡抽題。</p>
 
                 <div class="toggle-group" style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 15px;">
                     <label class="switch">
                         <input type="checkbox" id="ai-toggle">
                         <span class="slider"></span>
                     </label>
-                    <span style="color: #007bff; font-weight: bold;">開啟 Gemini AI 語意批改 (限中文作答)</span>
+                    <span style="color: #007bff; font-weight: bold;">開啟 Gemini AI 語意批改</span>
                 </div>
                 <div id="ai-settings" class="hidden" style="margin-bottom: 15px;">
-                    <p style="font-size: 12px; color: #666; margin-bottom: 5px;">⚠️ 啟用後將強制進行測驗，結束後統一交由 AI 對答案。</p>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 5px;">⚠️ 啟用後將強制進行測驗，結束後統一交由 AI 對答案(需包含中文作答)。</p>
                     <input type="password" id="gemini-api-key" placeholder="請輸入 Gemini API Key..." autocomplete="off">
                 </div>
                 
@@ -67,7 +59,11 @@
                 <button id="reset-data-btn" class="danger-btn">Sweep 🧹 重設所有單字進度 (歸零)</button>
             </div>
 
-            <button id="start-btn" class="primary-btn">開始今日 30 題特訓</button>
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                <button id="start-new-words-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px; background: #20c997; box-shadow: 0 4px 12px rgba(32,201,151,0.3);">🆕 專屬：今日 30 個新單字</button>
+                <button id="start-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px;">🚀 綜合：新單字 ＋ 舊複習</button>
+                <button id="start-frequent-mistakes-btn" class="primary-btn" style="margin: 0; background: #6c757d; box-shadow: 0 4px 12px rgba(108,117,125,0.3);">💀 常錯單字死穴特訓</button>
+            </div>
         </div>
 
         <div id="quiz-section" class="hidden">
@@ -90,6 +86,7 @@
             <div id="input-area" class="hidden">
                 <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px;">
                     <input type="text" id="kanji-input" placeholder="請輸入漢字..." autocomplete="off">
+                    <input type="text" id="kana-input" placeholder="請輸入假名拼音..." autocomplete="off">
                     <input type="text" id="chinese-input" placeholder="請輸入中文意思..." autocomplete="off">
                 </div>
                 <button id="submit-btn" class="primary-btn">送出答案</button>
@@ -164,8 +161,8 @@
 
     <div id="round-modal" class="hidden">
         <div class="modal-card" style="text-align: center;">
-            <h2 style="color: #28a745; margin-bottom: 10px;">🎉 恭喜！</h2>
-            <p style="color: #555; margin-bottom: 25px;">本日 30 個單字已全數過關！<br>你要重新挑戰這一輪，還是結束今日任務？</p>
+            <h2 style="color: #28a745; margin-bottom: 10px;">🎉 恭喜過關！</h2>
+            <p style="color: #555; margin-bottom: 25px;">本輪單字已全數消滅！<br>你要重新挑戰這一輪，還是結束任務？</p>
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <button onclick="restartRound()" class="primary-btn" style="margin:0;">🔄 重新進行這一輪 (不限次數)</button>
                 <button onclick="document.getElementById('home-btn').click(); document.getElementById('round-modal').classList.add('hidden');" class="secondary-btn">🏠 結束並回首頁</button>

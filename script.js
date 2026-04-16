@@ -214,7 +214,7 @@ qType.addEventListener('change', () => {
     localStorage.setItem('savedQType', qType.value);
 });
 
-
+// ⭐ 取得「學習日」(跨日為隔日 8:00 AM)
 function getStudyDate(dateInput) {
     let d = new Date(dateInput);
     if (isNaN(d.getTime())) return new Date(0); 
@@ -269,7 +269,7 @@ async function loadVocabCSV() {
             error: (err) => {
                 console.error("CSV載入失敗:", err);
                 if (window.location.protocol === 'file:') {
-                    alert("⚠️ 嚴重錯誤：瀏覽器阻擋了讀取本地的 vocab.csv 檔案！\n\n因為安全限制，你不能直接點擊 html 檔案開啟。\n請使用 Live Server 或上傳到網頁伺服器上運行！");
+                    alert("⚠️ 嚴重錯誤：瀏覽器阻擋了讀取本地的 vocab.csv 檔案！\n\n請使用 Live Server 或上傳到網頁伺服器上運行！");
                 } else {
                     alert("⚠️ 找不到 vocab.csv 檔案！請確定檔案與網頁放在同一個資料夾。");
                 }
@@ -329,17 +329,19 @@ function initDailyPool() {
     dailyPool = [...dailyNewWords, ...dueOldWords];
 }
 
+// ⭐ 強制每次點擊都從雲端同步，破解「網頁放過夜」的進度卡死 Bug
 async function ensureDataLoaded(btnElement) {
-    if (vocabData.length > 0) return true; 
-    
     const originalText = btnElement.innerText;
     btnElement.innerText = "同步數據中...";
     btnElement.disabled = true; 
     
     try {
-        await loadVocabCSV();
-        if (vocabData.length === 0) return false; 
+        if (vocabData.length === 0) {
+            await loadVocabCSV();
+            if (vocabData.length === 0) return false; 
+        }
 
+        // 強制拉取最新雲端數據
         const cloudData = await refreshHomeStats();
         if (cloudData === null) {
             alert("⚠️ 無法連線到 Google Sheet 資料庫！\n\n系統將切換為「單機模式」運行。如需存檔，請確認 API URL 與部署權限。");
@@ -544,7 +546,7 @@ function renderVocabList() {
     const statusCat = document.getElementById('status-filter').value; 
     const searchTerm = searchInput.value.trim().toLowerCase();
 
-    let matchCount = 0; // ⭐ 新增：計算符合條件的單字數量
+    let matchCount = 0; 
 
     vocabData.forEach((w, index) => {
         if (!w['詞性']) return;
@@ -575,7 +577,7 @@ function renderVocabList() {
         }
         if (!match) return;
 
-        matchCount++; // ⭐ 符合條件，數量+1
+        matchCount++; 
 
         const item = document.createElement('div');
         item.className = "list-item";
@@ -622,7 +624,6 @@ function renderVocabList() {
         vocabListContainer.appendChild(item);
     });
 
-    // ⭐ 更新數量顯示區
     const countDisplay = document.getElementById('vocab-count-display');
     if (countDisplay) {
         countDisplay.innerText = `共找到 ${matchCount} 個單字`;
@@ -1126,6 +1127,7 @@ function showFullCard(isCorrect, userDisplayArr = []) {
     nextBtn.classList.remove('hidden');
 }
 
+// ⭐ 修復下次複習日的推算基準為「學習日」
 function updateLocalNextReviewDate(wordObj, status) {
     const intervals = [0, 1, 2, 4, 7, 15, 30, 60, 90];
     let daysToAdd = 0;
@@ -1134,7 +1136,8 @@ function updateLocalNextReviewDate(wordObj, status) {
         daysToAdd = intervals[wordObj.level] || 90;
     } 
     
-    let nextDate = new Date();
+    // 使用「學習日」作為基準，避免半夜過 12 點推算錯誤
+    let nextDate = getStudyDate(new Date());
     nextDate.setDate(nextDate.getDate() + daysToAdd);
     
     const yyyy = nextDate.getFullYear();
@@ -1320,7 +1323,7 @@ batchFinishBtn.onclick = () => {
     quizSection.classList.add('hidden');
     batchResultsArea.classList.add('hidden'); 
     setupSection.classList.remove('hidden');
-    refreshHomeStats();
+    refreshHomeStats(); // 背景同步，不阻塞 UI
 };
 
 homeBtn.onclick = () => { 
@@ -1332,7 +1335,7 @@ homeBtn.onclick = () => {
     quizSection.classList.add('hidden'); 
     batchResultsArea.classList.add('hidden'); 
     setupSection.classList.remove('hidden'); 
-    refreshHomeStats(); 
+    refreshHomeStats(); // 背景同步，不阻塞 UI
 };
 
 // --- 8. 事件監聽 ---

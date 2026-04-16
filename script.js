@@ -73,6 +73,7 @@ let roundPending = [];
 let hwChoices = {};           
 let currentManualChoice = null; 
 let sessionMistakes = new Set(); 
+let lastSyncStudyDate = null; // 🚀 新增：紀錄最後同步的「學習日」，用來防卡頓
 
 let isMistakeMode = false;       
 let isFrequentMistakeMode = false; 
@@ -214,7 +215,7 @@ qType.addEventListener('change', () => {
     localStorage.setItem('savedQType', qType.value);
 });
 
-// ⭐ 取得「學習日」(跨日為隔日 8:00 AM)
+
 function getStudyDate(dateInput) {
     let d = new Date(dateInput);
     if (isNaN(d.getTime())) return new Date(0); 
@@ -329,10 +330,19 @@ function initDailyPool() {
     dailyPool = [...dailyNewWords, ...dueOldWords];
 }
 
-// ⭐ 強制每次點擊都從雲端同步，破解「網頁放過夜」的進度卡死 Bug
+// 🚀 核心升級：防卡頓智能快取機制
 async function ensureDataLoaded(btnElement) {
+    const currentStudyDate = getTodayStudyString();
+
+    // 如果已經載入過資料，而且還在「同一天」，直接秒進測驗，不要去煩 API！
+    if (vocabData.length > 0 && lastSyncStudyDate === currentStudyDate) {
+        initDailyPool(); 
+        return true; 
+    }
+    
+    // 如果是新的一天，或者剛開啟網頁，才執行底下的雲端同步
     const originalText = btnElement.innerText;
-    btnElement.innerText = "同步數據中...";
+    btnElement.innerText = "連線同步中...";
     btnElement.disabled = true; 
     
     try {
@@ -341,7 +351,6 @@ async function ensureDataLoaded(btnElement) {
             if (vocabData.length === 0) return false; 
         }
 
-        // 強制拉取最新雲端數據
         const cloudData = await refreshHomeStats();
         if (cloudData === null) {
             alert("⚠️ 無法連線到 Google Sheet 資料庫！\n\n系統將切換為「單機模式」運行。如需存檔，請確認 API URL 與部署權限。");
@@ -369,6 +378,7 @@ async function ensureDataLoaded(btnElement) {
             });
         }
         
+        lastSyncStudyDate = currentStudyDate; // 🚀 更新最後同步日，防止後續無意義的卡頓
         initDailyPool(); 
         updateMistakeBtn(); 
         return true;
@@ -1127,7 +1137,6 @@ function showFullCard(isCorrect, userDisplayArr = []) {
     nextBtn.classList.remove('hidden');
 }
 
-// ⭐ 修復下次複習日的推算基準為「學習日」
 function updateLocalNextReviewDate(wordObj, status) {
     const intervals = [0, 1, 2, 4, 7, 15, 30, 60, 90];
     let daysToAdd = 0;
@@ -1136,8 +1145,7 @@ function updateLocalNextReviewDate(wordObj, status) {
         daysToAdd = intervals[wordObj.level] || 90;
     } 
     
-    // 使用「學習日」作為基準，避免半夜過 12 點推算錯誤
-    let nextDate = getStudyDate(new Date());
+    let nextDate = new Date();
     nextDate.setDate(nextDate.getDate() + daysToAdd);
     
     const yyyy = nextDate.getFullYear();

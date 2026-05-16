@@ -73,7 +73,7 @@ let roundPending = [];
 let hwChoices = {};           
 let currentManualChoice = null; 
 let sessionMistakes = new Set(); 
-let lastSyncStudyDate = null; // 🚀 新增：紀錄最後同步的「學習日」，用來防卡頓
+let lastSyncStudyDate = null; 
 
 let isMistakeMode = false;       
 let isFrequentMistakeMode = false; 
@@ -330,17 +330,14 @@ function initDailyPool() {
     dailyPool = [...dailyNewWords, ...dueOldWords];
 }
 
-// 🚀 核心升級：防卡頓智能快取機制
 async function ensureDataLoaded(btnElement) {
     const currentStudyDate = getTodayStudyString();
 
-    // 如果已經載入過資料，而且還在「同一天」，直接秒進測驗，不要去煩 API！
     if (vocabData.length > 0 && lastSyncStudyDate === currentStudyDate) {
         initDailyPool(); 
         return true; 
     }
     
-    // 如果是新的一天，或者剛開啟網頁，才執行底下的雲端同步
     const originalText = btnElement.innerText;
     btnElement.innerText = "連線同步中...";
     btnElement.disabled = true; 
@@ -378,7 +375,7 @@ async function ensureDataLoaded(btnElement) {
             });
         }
         
-        lastSyncStudyDate = currentStudyDate; // 🚀 更新最後同步日，防止後續無意義的卡頓
+        lastSyncStudyDate = currentStudyDate; 
         initDailyPool(); 
         updateMistakeBtn(); 
         return true;
@@ -613,14 +610,15 @@ function renderVocabList() {
 
         let rateDisplay = w.drawCount > 0 ? `${Math.round(w.errorRate * 100)}%` : '-';
 
+        // ⭐ 日文漢字標籤 <span class="jp-text" lang="ja"> 加入
         item.innerHTML = `
             <div style="width: 45px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
                 <div style="font-size: 10px; color: #999; font-family: monospace; margin-bottom: 4px;">#${w['單字編號'] || (index + 1)}</div>
                 <div style="font-size: 9px; color: ${lvColor}; background: ${lvBg}; border-radius: 4px; padding: 2px 5px; font-weight: bold;">${lvText}</div>
             </div>
             <div style="flex: 1.5; text-align: left; padding-left: 5px; min-width: 0;">
-                <div style="font-size:16px; font-weight:bold; color:#2c3e50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${w['漢字']}</div>
-                <div style="font-size:11px; color:#666;">${displayKana} <span style="color:#007bff; font-weight:bold; margin-left:3px;">${displayAccent}</span></div>
+                <div style="font-size:16px; font-weight:bold; color:#2c3e50; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" class="jp-text" lang="ja">${w['漢字']}</div>
+                <div style="font-size:11px; color:#666;" class="jp-text" lang="ja">${displayKana} <span style="color:#007bff; font-weight:bold; margin-left:3px; font-family: sans-serif;">${displayAccent}</span></div>
             </div>
             <div style="flex: 0.9; text-align: center;">
                 <div style="color: #6c757d; font-size: 10px; background: #f8f9fa; border-radius: 4px; margin: 0 5px; padding: 2px 0;">${w['詞性']}</div>
@@ -646,12 +644,12 @@ window.showWordDetail = (index) => {
     const detailKana = w['假名拼音(分別)'] || w['假名拼音'] || "";
     modalContent.innerHTML = `
         <span class="close-btn" onclick="closeModal()" style="position:absolute; top:10px; right:15px; font-size:28px; cursor:pointer;">&times;</span>
-        <div style="font-size: 24px; margin-bottom:5px;"><strong>${w['漢字']}</strong></div>
-        <div style="color:#666; margin-bottom:10px;">${detailKana} ${w['重音'] || ''} | ${w['詞性']}</div>
+        <div style="font-size: 24px; margin-bottom:5px;" class="jp-text" lang="ja"><strong>${w['漢字']}</strong></div>
+        <div style="color:#666; margin-bottom:10px;" class="jp-text" lang="ja">${detailKana} <span style="font-family: sans-serif;">${w['重音'] || ''} | ${w['詞性']}</span></div>
         <div style="color:#d9534f; font-weight:bold; font-size:18px;">中文：${w['中文意思']}</div>
         <hr>
-        <div class="sentence-row" onclick="playTTS('1')" style="cursor:pointer; padding:8px; background:#f9f9f9; border-radius:5px;">🔊 <strong>例句 1：</strong>${w['常用例句 1日']}<br><small style="color:#666;">${w['常用例句 1中']}</small></div>
-        <div class="sentence-row" onclick="playTTS('2')" style="cursor:pointer; padding:8px; background:#f9f9f9; border-radius:5px; margin-top:10px;">🔊 <strong>例句 2：</strong>${w['常用例句 2日']}<br><small style="color:#666;">${w['常用例句 2中']}</small></div>
+        <div class="sentence-row" onclick="playTTS('1')" style="cursor:pointer; padding:8px; background:#f9f9f9; border-radius:5px;">🔊 <strong style="font-family: sans-serif;">例句 1：</strong><span class="jp-text" lang="ja">${w['常用例句 1日']}</span><br><small style="color:#666;">${w['常用例句 1中']}</small></div>
+        <div class="sentence-row" onclick="playTTS('2')" style="cursor:pointer; padding:8px; background:#f9f9f9; border-radius:5px; margin-top:10px;">🔊 <strong style="font-family: sans-serif;">例句 2：</strong><span class="jp-text" lang="ja">${w['常用例句 2日']}</span><br><small style="color:#666;">${w['常用例句 2中']}</small></div>
     `;
     wordModal.classList.remove('hidden');
 };
@@ -751,7 +749,6 @@ function startQuiz() {
         }
     }
 
-    // --- AI 模式 ---
     if (aiToggle.checked && !isHwBatchMode) {
         const apiKey = geminiApiKeyInput.value.trim();
         if (!apiKey) { alert("請先輸入 Gemini API Key！"); return; }
@@ -767,7 +764,6 @@ function startQuiz() {
         currentBatchIdx = 0;
         batchQuestions = getBatchWords(dueWords, Math.min(AI_BATCH_SIZE, dueWords.length));
     } 
-    // --- 批次手寫練習模式 ---
     else if (isHwBatchMode) {
         isBatchMode = false;
         hwQuestions = getBatchWords(dueWords, Math.min(HW_BATCH_SIZE, dueWords.length));
@@ -777,7 +773,6 @@ function startQuiz() {
         renderHwBatch(); 
         return; 
     } 
-    // --- 常規單題模式 ---
     else {
         isBatchMode = false;
         isHwBatchMode = false;
@@ -851,7 +846,6 @@ function getNextWord() {
     return getWeightedRandomWord(dueWords);
 }
 
-// ⭐ 動態產生每題的 UI
 function nextQuestion() {
     processManualChoice(); 
     stopAllAudio();
@@ -905,7 +899,7 @@ function nextQuestion() {
         activeSentenceIdx = (Math.random() < 0.5 && currentWord['常用例句 2題目']) ? 2 : 1;
         const cnTrans = currentWord[`常用例句 ${activeSentenceIdx}中`];
         const sentenceQ = currentWord[`常用例句 ${activeSentenceIdx}題目`];
-        questionDisplay.innerHTML = `<div style="font-size:18px; color:#666; margin-bottom:10px;">${cnTrans}</div><div>${sentenceQ}</div>`;
+        questionDisplay.innerHTML = `<div style="font-size:18px; color:#666; margin-bottom:10px;">${cnTrans}</div><div class="jp-text" lang="ja">${sentenceQ}</div>`;
     } else if (currentActiveQType === 'audio') {
         questionDisplay.innerText = "🎧 聽力測驗 (聽音拼寫)";
         playAudioBtn.classList.remove('hidden');
@@ -913,7 +907,7 @@ function nextQuestion() {
     } else if (currentActiveQType === '中文意思') {
         questionDisplay.innerHTML = `${currentWord['中文意思']} <span style="font-size:18px; color:#e67e22;">[${currentWord['詞性']}]</span>`;
     } else if (currentActiveQType === '漢字') {
-        questionDisplay.innerText = currentWord['漢字'] || currentWord['假名拼音'];
+        questionDisplay.innerHTML = `<span class="jp-text" lang="ja">${currentWord['漢字'] || currentWord['假名拼音']}</span>`;
     } 
 }
 
@@ -968,9 +962,9 @@ function renderHwBatch() {
             qText = `${w['中文意思']} <span style="color:#e67e22; font-size:14px; font-weight:normal;">[${w['詞性']}]</span>`;
         } else if (currentQType === 'sentence') {
             const sIdx = (Math.random() < 0.5 && w['常用例句 2題目']) ? 2 : 1;
-            qText = `<div style="font-size:14px; color:#666; font-weight:normal;">${w[`常用例句 ${sIdx}中`]}</div><div>${w[`常用例句 ${sIdx}題目`]}</div>`;
+            qText = `<div style="font-size:14px; color:#666; font-weight:normal;">${w[`常用例句 ${sIdx}中`]}</div><div class="jp-text" lang="ja">${w[`常用例句 ${sIdx}題目`]}</div>`;
         } else {
-            qText = w['漢字'] || w['假名拼音'];
+            qText = `<span class="jp-text" lang="ja">${w['漢字'] || w['假名拼音']}</span>`;
         }
 
         const wordIdx = vocabData.findIndex(vw => vw.uniqueId === w.uniqueId);
@@ -986,7 +980,7 @@ function renderHwBatch() {
                 </div>
                 
                 <div id="hw-ans-${idx}" class="hidden" style="margin-top:15px; padding-top:15px; border-top:1px dashed #ccc; text-align:left;">
-                    <div style="font-size: 22px;"><strong>${w['漢字']}</strong> (${displayKana})</div>
+                    <div style="font-size: 22px;" class="jp-text" lang="ja"><strong>${w['漢字']}</strong> (${displayKana})</div>
                     <div style="color: #d9534f; font-weight: bold;">中文：${w['中文意思']}</div>
                     
                     <button onclick="showWordDetail(${wordIdx})" class="secondary-btn" style="margin-bottom:10px; width:auto; padding:4px 8px; font-size:12px; color:#007bff; background:#e9ecef;">🔍 展開單字卡</button>
@@ -1121,15 +1115,15 @@ function showFullCard(isCorrect, userDisplayArr = []) {
     feedback.innerHTML = `
         <div class="card-box" style="border: 2px solid #ccc; padding: 15px; border-radius: 10px; background: #fff; margin-top: 15px; text-align: left;">
             ${headerHTML}
-            <div style="font-size: 24px;"><strong>${currentWord['漢字']}</strong> (${displayKana})</div>
+            <div style="font-size: 24px;" class="jp-text" lang="ja"><strong>${currentWord['漢字']}</strong> (${displayKana})</div>
             <div style="color: #d9534f; font-weight: bold;">中文：${currentWord['中文意思']}</div>
             <div style="font-size: 14px; color: #777;">[${currentWord['詞性']}] | 重音：${currentWord['重音'] || '-'}</div>
             
             <button onclick="showWordDetail(${wordIdx})" class="secondary-btn" style="margin-top:10px; width:auto; padding:6px 12px; font-size:12px; font-weight:bold; color:#007bff; background:#e9ecef; border-radius:8px;">🔍 開啟詳細單字卡</button>
             <hr>
             <div style="font-size: 15px; background: #f1f1f1; padding: 10px; border-radius: 8px;">
-                <div class="sentence-row" onclick="playTTS('1')" style="cursor:pointer; margin-bottom:10px;">🔊 <strong>例句 1：</strong>${currentWord['常用例句 1日']}<br><small style="color:#666;">${currentWord['常用例句 1中']}</small></div>
-                <div class="sentence-row" onclick="playTTS('2')" style="cursor:pointer;">🔊 <strong>例句 2：</strong>${currentWord['常用例句 2日']}<br><small style="color:#666;">${currentWord['常用例句 2中']}</small></div>
+                <div class="sentence-row" onclick="playTTS('1')" style="cursor:pointer; margin-bottom:10px;">🔊 <strong style="font-family: sans-serif;">例句 1：</strong><span class="jp-text" lang="ja">${currentWord['常用例句 1日']}</span><br><small style="color:#666;">${currentWord['常用例句 1中']}</small></div>
+                <div class="sentence-row" onclick="playTTS('2')" style="cursor:pointer;">🔊 <strong style="font-family: sans-serif;">例句 2：</strong><span class="jp-text" lang="ja">${currentWord['常用例句 2日']}</span><br><small style="color:#666;">${currentWord['常用例句 2中']}</small></div>
             </div>
         </div>
     `;
@@ -1301,10 +1295,10 @@ function renderBatchResults(aiResults) {
 
         html += `
             <div class="card-box" onclick="showWordDetail(${wordIndex})" style="border: 2px solid ${boxColor}; margin-bottom: 10px; padding: 12px; cursor: pointer; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
-                <h4 style="margin: 0 0 8px 0; font-size: 18px;">${statusIcon} ${item.word['漢字']} (${displayKana})</h4>
+                <h4 style="margin: 0 0 8px 0; font-size: 18px;" class="jp-text" lang="ja">${statusIcon} ${item.word['漢字']} (${displayKana})</h4>
                 <p style="margin: 3px 0; font-size: 14px; color: #555;">標準答案: ${item.word['中文意思']}</p>
                 <p style="margin: 3px 0; font-size: 14px; color: #007bff; font-weight: bold;">
-                    你的輸入: ${item.userC} ${currentActiveATypes.includes('漢字') ? ` (漢字: ${item.userK})` : ''}
+                    你的輸入: ${item.userC} ${currentActiveATypes.includes('漢字') ? ` (漢字: <span class="jp-text" lang="ja">${item.userK}</span>)` : ''}
                 </p>
                 <div style="margin-top: 5px; font-size: 13px; background: #f8f9fa; padding: 5px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center;">
                     ${aiTagStr}
@@ -1331,7 +1325,7 @@ batchFinishBtn.onclick = () => {
     quizSection.classList.add('hidden');
     batchResultsArea.classList.add('hidden'); 
     setupSection.classList.remove('hidden');
-    refreshHomeStats(); // 背景同步，不阻塞 UI
+    refreshHomeStats(); 
 };
 
 homeBtn.onclick = () => { 
@@ -1343,7 +1337,7 @@ homeBtn.onclick = () => {
     quizSection.classList.add('hidden'); 
     batchResultsArea.classList.add('hidden'); 
     setupSection.classList.remove('hidden'); 
-    refreshHomeStats(); // 背景同步，不阻塞 UI
+    refreshHomeStats(); 
 };
 
 // --- 8. 事件監聽 ---

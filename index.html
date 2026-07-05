@@ -21,12 +21,32 @@
                     <option value="漢字">漢字出題</option>
                     <option value="中文意思">中文意思出題</option>
                     <option value="sentence">例句填空模式</option>
+                    <option value="flashcard" style="color: #6f42c1; font-weight: bold;">🃏 小卡翻牌自評模式 (Anki Memory)</option>
                     <option value="mixed" style="color: #ea580c; font-weight: bold;">🌪️ 混合考題大亂鬥</option>
                 </select>
             </div>
 
             <div class="control-group" id="aType-container" style="background: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #e1e8ed;">
                 </div>
+
+            <!-- 測驗詞性與小類過濾器 -->
+            <div class="control-group" style="background: #e8f4f8; padding: 12px; border-radius: 12px; border: 1px solid #bee5eb; margin-bottom: 18px;">
+                <label style="color: #0c5460; margin-bottom: 8px;">🏷️ 測驗範圍 (詞性／小類過濾)：</label>
+                <div style="display: flex; gap: 8px;">
+                    <select id="quiz-main-cat" onchange="updateQuizSubCategories()" style="flex: 1; border-color: #bee5eb; background: #fff;">
+                        <option value="all">全部詞性 (不限)</option>
+                        <option value="名詞">名詞</option>
+                        <option value="動詞">動詞</option>
+                        <option value="形容詞">形容詞</option>
+                        <option value="副詞">副詞</option>
+                        <option value="慣用">慣用</option>
+                        <option value="其他">其他</option>
+                    </select>
+                    <select id="quiz-sub-cat" style="flex: 1; border-color: #bee5eb; background: #fff;">
+                        <option value="all">全部小類 (不限)</option>
+                    </select>
+                </div>
+            </div>
 
             <div class="advanced-settings">
                 <div class="toggle-group" style="margin-bottom: 5px;">
@@ -66,6 +86,7 @@
             <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
                 <button id="start-new-words-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px; background: #20c997; box-shadow: 0 4px 12px rgba(32,201,151,0.3);">🆕 專屬：今日 30 個新單字</button>
                 <button id="start-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px;">🚀 綜合：新單字 ＋ 舊複習</button>
+                <button id="start-pos-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px; background: #17a2b8; box-shadow: 0 4px 12px rgba(23,162,184,0.3);">🎯 專屬：指定詞性／小類特訓</button>
                 <button id="start-frequent-mistakes-btn" class="primary-btn" style="margin: 0; background: #6c757d; box-shadow: 0 4px 12px rgba(108,117,125,0.3);">💀 常錯單字死穴特訓</button>
             </div>
         </div>
@@ -105,9 +126,40 @@
                 </div>
             </div>
 
+            <!-- ⭐ 新增/升級：3D 翻轉小卡區域 -->
             <div id="flashcard-area" class="hidden">
-                <div id="flashcard" onclick="checkAnswer()">
-                    <div class="card-face">點擊此處 / 按 Enter 查看完整單字卡</div>
+                <div class="flashcard-container" onclick="flipFlashcard()">
+                    <div class="flashcard-inner" id="flashcard-inner">
+                        <!-- 卡片正面 -->
+                        <div class="flashcard-front">
+                            <div id="fc-front-tag" class="fc-tag">Q. 單字記憶</div>
+                            <div id="fc-front-word" class="fc-word jp-text" lang="ja">漢字</div>
+                            <div id="fc-front-hint" class="fc-hint">點擊卡片或按空白鍵 (Space) 翻面</div>
+                            <button onclick="event.stopPropagation(); playTTS('word');" class="fc-audio-btn">🔊 聽發音</button>
+                        </div>
+                        <!-- 卡片背面 -->
+                        <div class="flashcard-back">
+                            <div id="fc-back-tag" class="fc-tag" style="background: #e8f5e9; color: #28a745;">A. 答案解析</div>
+                            <div id="fc-back-word" class="fc-word jp-text" lang="ja">漢字</div>
+                            <div id="fc-back-kana" class="fc-kana jp-text" lang="ja">假名拼音 [重音]</div>
+                            <div id="fc-back-meaning" class="fc-meaning">中文意思</div>
+                            <hr style="width: 90%; border: 0; border-top: 1px dashed #ddd; margin: 10px 0;">
+                            <div id="fc-back-sentences" class="fc-sentences"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 小卡控制按鈕區：依據是「自評測驗」還是「純背誦瀏覽」顯示 -->
+                <div id="fc-quiz-ctrl" class="hidden" style="display: flex; gap: 10px; margin-top: 15px;">
+                    <button onclick="gradeFlashcard(false)" class="hw-grade-btn" style="background: #fdeeed; color: #dc3545; border: 2px solid #dc3545; flex: 1; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 15px;">❌ 忘記了 (按 ←)</button>
+                    <button onclick="gradeFlashcard(true)" class="hw-grade-btn" style="background: #e8f5e9; color: #28a745; border: 2px solid #28a745; flex: 1; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 15px;">✅ 記住了 (按 → / Enter)</button>
+                </div>
+
+                <div id="fc-pure-ctrl" class="hidden" style="display: flex; gap: 6px; margin-top: 15px; align-items: center;">
+                    <button onclick="exitPureFlashcardMode()" class="secondary-btn" style="padding: 12px 14px; font-size: 14px; white-space: nowrap;">⬅ 回列表</button>
+                    <button onclick="pureFCPrev()" class="secondary-btn" style="flex: 1; padding: 12px; font-size: 15px;">⬆ 上一張</button>
+                    <span id="fc-pure-progress" style="font-weight: bold; color: #666; font-size: 14px; min-width: 65px; text-align: center;">1 / 30</span>
+                    <button onclick="pureFCNext()" class="primary-btn" style="flex: 1; margin: 0; padding: 12px; background: #6f42c1; font-size: 15px;">下一張 ⬇</button>
                 </div>
             </div>
 
@@ -160,7 +212,14 @@
                 </div>
             </div>
 
-            <div id="vocab-count-display" style="font-size: 14px; color: #007bff; font-weight: bold; margin-bottom: 10px; text-align: left;"></div>
+            <!-- ⭐ 修改：匯出與小卡背誦操作列 -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                <div id="vocab-count-display" style="font-size: 14px; color: #007bff; font-weight: bold;"></div>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="startPureFlashcardMode()" class="secondary-btn" style="background: #6f42c1; color: white; border: none; padding: 6px 14px; font-size: 13px;">🃏 進入小卡背誦模式</button>
+                    <button onclick="openExportModal()" class="secondary-btn" style="background: #17a2b8; color: white; border: none; padding: 6px 14px; font-size: 13px;">📥 下載 / 複製單字表</button>
+                </div>
+            </div>
 
             <div id="vocab-list-container"></div>
         </div>
@@ -180,6 +239,32 @@
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <button onclick="restartRound()" class="primary-btn" style="margin:0;">🔄 重新進行這一輪 (不限次數)</button>
                 <button onclick="document.getElementById('home-btn').click(); document.getElementById('round-modal').classList.add('hidden');" class="secondary-btn">🏠 結束並回首頁</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 單字表匯出設定彈窗 -->
+    <div id="export-modal" class="hidden">
+        <div class="modal-card" style="max-width: 450px;">
+            <span class="close-btn" onclick="closeExportModal()">&times;</span>
+            <h3 style="color: #007bff; margin-top: 0; margin-bottom: 5px;">📥 匯出 / 下載單字表</h3>
+            <p style="font-size: 12px; color: #666; margin-bottom: 15px;">將目前篩選出的「<span id="export-count" style="color: #d9534f; font-weight: bold;">0</span>」個單字匯出。請勾選你需要包含的表格欄位：</p>
+            
+            <div style="background: #f8f9fa; padding: 12px; border-radius: 10px; border: 1px solid #eee; margin-bottom: 15px; text-align: left;">
+                <div class="checkbox-group-title">選擇匯出欄位：</div>
+                <label class="chk-label"><input type="checkbox" name="export-col" value="單字編號"> 編號</label>
+                <label class="chk-label"><input type="checkbox" name="export-col" value="漢字" checked> 漢字</label>
+                <label class="chk-label"><input type="checkbox" name="export-col" value="假名拼音" checked> 假名拼音</label>
+                <label class="chk-label"><input type="checkbox" name="export-col" value="重音" checked> 重音</label>
+                <label class="chk-label"><input type="checkbox" name="export-col" value="詞性" checked> 詞性</label>
+                <label class="chk-label"><input type="checkbox" name="export-col" value="中文意思" checked> 中文意思</label>
+                <label class="chk-label"><input type="checkbox" name="export-col" value="常用例句 1日"> 例句日文(1)</label>
+                <label class="chk-label"><input type="checkbox" name="export-col" value="常用例句 1中"> 例句中文(1)</label>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+                <button onclick="copyVocabTable()" class="secondary-btn" style="flex: 1; background: #6c757d; color: white;">📋 複製表格內容</button>
+                <button onclick="downloadVocabCSV()" class="primary-btn" style="flex: 1; margin-top: 0; background: #28a745;">💾 下載 CSV 檔案</button>
             </div>
         </div>
     </div>

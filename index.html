@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="container">
@@ -27,24 +28,52 @@
             </div>
 
             <div class="control-group" id="aType-container" style="background: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #e1e8ed;">
-                </div>
+            </div>
 
-            <!-- 測驗詞性與小類過濾器 -->
-            <div class="control-group" style="background: #e8f4f8; padding: 12px; border-radius: 12px; border: 1px solid #bee5eb; margin-bottom: 18px;">
-                <label style="color: #0c5460; margin-bottom: 8px;">🏷️ 測驗範圍 (詞性／小類過濾)：</label>
-                <div style="display: flex; gap: 8px;">
-                    <select id="quiz-main-cat" onchange="updateQuizSubCategories()" style="flex: 1; border-color: #bee5eb; background: #fff;">
-                        <option value="all">全部詞性 (不限)</option>
-                        <option value="名詞">名詞</option>
-                        <option value="動詞">動詞</option>
-                        <option value="形容詞">形容詞</option>
-                        <option value="副詞">副詞</option>
-                        <option value="慣用">慣用</option>
-                        <option value="其他">其他</option>
+            <!-- ⭐ 終極進化：點擊大類後「跳出彈窗」的選單機制 -->
+            <div class="control-group" style="background: #e8f4f8; padding: 14px; border-radius: 16px; border: 1px solid #bee5eb; margin-bottom: 18px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <label style="color: #0c5460; margin: 0; font-weight: bold; font-size: 14px;">🏷️ 測驗範圍：</label>
+                    <div style="font-size: 12px; color: #0c5460; font-weight: bold; background: #d1ecf1; padding: 2px 8px; border-radius: 10px;" id="selected-sub-count">已選定：0 個小類</div>
+                </div>
+                
+                <div style="position: relative;">
+                    <!-- 大類下拉式選單 (點擊後觸發面板跳出) -->
+                    <select id="main-cat-picker" onchange="openSubPanel(this.value)" style="padding: 12px 10px; font-weight: bold; border-color: #007bff; border-width: 2px; color: #007bff; background: #f8f9fa; font-size: 15px;">
+                        <option value="" disabled selected>👉 點選下拉清單，展開大類 ▾</option>
+                        <option value="名詞">📁 名詞</option>
+                        <option value="動詞">📁 動詞</option>
+                        <option value="形容詞">📁 形容詞</option>
+                        <option value="副詞">📁 副詞</option>
+                        <option value="慣用">📁 慣用</option>
+                        <option value="其他">📁 其他</option>
                     </select>
-                    <select id="quiz-sub-cat" style="flex: 1; border-color: #bee5eb; background: #fff;">
-                        <option value="all">全部小類 (不限)</option>
-                    </select>
+                    
+                    <div style="margin-top: 10px; display: flex; gap: 8px;">
+                        <button type="button" onclick="selectAllSubCats(true)" class="secondary-btn" style="flex:1; padding: 8px; font-size: 13px; background: #d1ecf1; color: #0c5460; border: none; font-weight: bold;">全庫全選</button>
+                        <button type="button" onclick="selectAllSubCats(false)" class="secondary-btn" style="flex:1; padding: 8px; font-size: 13px; background: #e2e3e5; color: #383d41; border: none; font-weight: bold;">全庫清空</button>
+                    </div>
+
+                    <!-- 彈出的右邊/覆蓋清單面板 (預設隱藏) -->
+                    <div id="right-sub-panel" class="hidden" style="position: absolute; top: -5px; left: -5px; right: -5px; background: #ffffff; border: 2px solid #007bff; border-radius: 14px; box-shadow: 0 12px 35px rgba(0,0,0,0.25); z-index: 100; overflow: hidden; display: flex; flex-direction: column; animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+                        
+                        <!-- 面板標題列與完成按鈕 -->
+                        <div style="background: #007bff; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: bold; font-size: 15px;" id="sub-panel-title">小類清單</span>
+                            <button type="button" onclick="closeSubPanel()" style="background: #fff; border: none; color: #007bff; font-weight: bold; padding: 6px 12px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✅ 確認完成</button>
+                        </div>
+
+                        <!-- 快速全選/清空本大類按鈕 -->
+                        <div style="padding: 12px 15px 0 15px; display: flex; gap: 8px;">
+                            <button type="button" onclick="toggleCurrentMainCat(true)" style="flex: 1; background: #e8f5e9; color: #28a745; border: 1px solid #c3e6cb; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;">+ 全選本類</button>
+                            <button type="button" onclick="toggleCurrentMainCat(false)" style="flex: 1; background: #fdeeed; color: #dc3545; border: 1px solid #f5c6cb; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;">- 清空本類</button>
+                        </div>
+
+                        <!-- 由上而下的垂直小類清單 -->
+                        <div id="sub-cat-tag-cloud" style="padding: 15px; display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto;">
+                            <!-- JS 自動生成 -->
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -93,7 +122,7 @@
 
         <div id="quiz-section" class="hidden">
             <div class="header-row">
-                <button id="home-btn">⬅ 回首頁</button>
+                <button id="home-btn">⬅ 回首頁 / 列表</button>
             </div>
             
             <div id="question-area">
@@ -126,18 +155,15 @@
                 </div>
             </div>
 
-            <!-- ⭐ 新增/升級：3D 翻轉小卡區域 -->
             <div id="flashcard-area" class="hidden">
                 <div class="flashcard-container" onclick="flipFlashcard()">
                     <div class="flashcard-inner" id="flashcard-inner">
-                        <!-- 卡片正面 -->
                         <div class="flashcard-front">
                             <div id="fc-front-tag" class="fc-tag">Q. 單字記憶</div>
                             <div id="fc-front-word" class="fc-word jp-text" lang="ja">漢字</div>
                             <div id="fc-front-hint" class="fc-hint">點擊卡片或按空白鍵 (Space) 翻面</div>
                             <button onclick="event.stopPropagation(); playTTS('word');" class="fc-audio-btn">🔊 聽發音</button>
                         </div>
-                        <!-- 卡片背面 -->
                         <div class="flashcard-back">
                             <div id="fc-back-tag" class="fc-tag" style="background: #e8f5e9; color: #28a745;">A. 答案解析</div>
                             <div id="fc-back-word" class="fc-word jp-text" lang="ja">漢字</div>
@@ -149,17 +175,9 @@
                     </div>
                 </div>
 
-                <!-- 小卡控制按鈕區：依據是「自評測驗」還是「純背誦瀏覽」顯示 -->
                 <div id="fc-quiz-ctrl" class="hidden" style="display: flex; gap: 10px; margin-top: 15px;">
                     <button onclick="gradeFlashcard(false)" class="hw-grade-btn" style="background: #fdeeed; color: #dc3545; border: 2px solid #dc3545; flex: 1; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 15px;">❌ 忘記了 (按 ←)</button>
                     <button onclick="gradeFlashcard(true)" class="hw-grade-btn" style="background: #e8f5e9; color: #28a745; border: 2px solid #28a745; flex: 1; padding: 14px; border-radius: 12px; font-weight: bold; font-size: 15px;">✅ 記住了 (按 → / Enter)</button>
-                </div>
-
-                <div id="fc-pure-ctrl" class="hidden" style="display: flex; gap: 6px; margin-top: 15px; align-items: center;">
-                    <button onclick="exitPureFlashcardMode()" class="secondary-btn" style="padding: 12px 14px; font-size: 14px; white-space: nowrap;">⬅ 回列表</button>
-                    <button onclick="pureFCPrev()" class="secondary-btn" style="flex: 1; padding: 12px; font-size: 15px;">⬆ 上一張</button>
-                    <span id="fc-pure-progress" style="font-weight: bold; color: #666; font-size: 14px; min-width: 65px; text-align: center;">1 / 30</span>
-                    <button onclick="pureFCNext()" class="primary-btn" style="flex: 1; margin: 0; padding: 12px; background: #6f42c1; font-size: 15px;">下一張 ⬇</button>
                 </div>
             </div>
 
@@ -212,7 +230,6 @@
                 </div>
             </div>
 
-            <!-- ⭐ 修改：匯出與小卡背誦操作列 -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
                 <div id="vocab-count-display" style="font-size: 14px; color: #007bff; font-weight: bold;"></div>
                 <div style="display: flex; gap: 8px;">
@@ -243,7 +260,6 @@
         </div>
     </div>
 
-    <!-- 單字表匯出設定彈窗 -->
     <div id="export-modal" class="hidden">
         <div class="modal-card" style="max-width: 450px;">
             <span class="close-btn" onclick="closeExportModal()">&times;</span>

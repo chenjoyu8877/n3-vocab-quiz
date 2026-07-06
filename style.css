@@ -259,7 +259,6 @@ input:checked + .slider:before { transform: translateX(22px); }
 }
 .list-item button:active { transform: scale(0.85); }
 
-/* 共用彈窗 (Modal) 的樣式 */
 #word-modal, #round-modal, #export-modal {
     position: fixed;
     top: 0;
@@ -525,7 +524,70 @@ button {
 ::-webkit-scrollbar-thumb { background: #dcdfe6; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: #c0c4cc; }
 
-/* ⭐ 確保日文漢字正確顯示的專屬字體設定 (強制覆蓋) */
 .jp-text, [lang="ja"] {
     font-family: "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, "Noto Sans JP", sans-serif !important;
+}
+
+/* =========================================
+   8. ⭐ 小類垂直清單按鈕專屬樣式與彈窗動畫
+   ========================================= */
+@keyframes popIn {
+    from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.tag-pill {
+    background-color: #f1f3f5;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 10px 14px; 
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    
+    display: flex;
+    justify-content: space-between; 
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
+}
+
+.tag-pill:hover {
+    background-color: #e2e6ea;
+    border-color: #ced4da;
+    transform: translateX(2px);
+}
+
+.tag-pill:active {
+    transform: scale(0.98);
+}
+
+/* 選定時：變深藍實心、白字 */
+.tag-pill.active {
+    background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
+    color: #ffffff;
+    border-color: #1a252f;
+    box-shadow: 0 4px 8px rgba(44, 62, 80, 0.25);
+    transform: translateX(4px); 
+}
+
+.tag-pill.active:hover {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+}
+
+/* 預留右側勾勾的位置 */
+.tag-pill::after {
+    content: ""; 
+    font-size: 14px;
+}
+
+/* 選定時右側顯示綠色勾勾 */
+.tag-pill.active::after {
+    content: "✓";
+    color: #69db7c; 
+    font-weight: 900;
 }

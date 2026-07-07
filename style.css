@@ -541,19 +541,16 @@ button {
     color: #495057;
     border: 1px solid #dee2e6;
     border-radius: 8px;
-    padding: 10px 14px; 
-    font-size: 14px;
-    font-weight: bold;
+    padding: 6px 12px;
+    font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s;
     user-select: none;
-    
-    display: flex;
-    justify-content: space-between; 
-    align-items: center;
-    width: 100%;
-    box-sizing: border-box;
-    text-align: left;
+}
+.tag-pill.active {
+    background-color: #d1ecf1 !important; /* 你想要的淺藍色 */
+    color: #0c5460 !important;
+    border-color: #bee5eb !important;
 }
 
 .tag-pill:hover {
@@ -562,17 +559,12 @@ button {
     transform: translateX(2px);
 }
 
-.tag-pill:active {
-    transform: scale(0.98);
-}
-
 /* 選定時：變深藍實心、白字 */
 .tag-pill.active {
-    background: linear-gradient(135deg, #2c3e50 0%, #1a252f 100%);
-    color: #ffffff;
-    border-color: #1a252f;
-    box-shadow: 0 4px 8px rgba(44, 62, 80, 0.25);
-    transform: translateX(4px); 
+    background: #d1ecf1 !important; /* 淺藍色背景 */
+    color: #0c5460 !important;     /* 深藍色文字 */
+    border: 1px solid #bee5eb !important;
+    transform: none;
 }
 
 .tag-pill.active:hover {

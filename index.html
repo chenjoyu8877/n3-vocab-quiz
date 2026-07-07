@@ -30,7 +30,6 @@
             <div class="control-group" id="aType-container" style="background: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #e1e8ed;">
             </div>
 
-            <!-- ⭐ 終極進化：點擊大類後「跳出彈窗」的選單機制 -->
             <div class="control-group" style="background: #e8f4f8; padding: 14px; border-radius: 16px; border: 1px solid #bee5eb; margin-bottom: 18px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <label style="color: #0c5460; margin: 0; font-weight: bold; font-size: 14px;">🏷️ 測驗範圍：</label>
@@ -38,7 +37,6 @@
                 </div>
                 
                 <div style="position: relative;">
-                    <!-- 大類下拉式選單 (點擊後觸發面板跳出) -->
                     <select id="main-cat-picker" onchange="openSubPanel(this.value)" style="padding: 12px 10px; font-weight: bold; border-color: #007bff; border-width: 2px; color: #007bff; background: #f8f9fa; font-size: 15px;">
                         <option value="" disabled selected>👉 點選下拉清單，展開大類 ▾</option>
                         <option value="名詞">📁 名詞</option>
@@ -54,25 +52,16 @@
                         <button type="button" onclick="selectAllSubCats(false)" class="secondary-btn" style="flex:1; padding: 8px; font-size: 13px; background: #e2e3e5; color: #383d41; border: none; font-weight: bold;">全庫清空</button>
                     </div>
 
-                    <!-- 彈出的右邊/覆蓋清單面板 (預設隱藏) -->
                     <div id="right-sub-panel" class="hidden" style="position: absolute; top: -5px; left: -5px; right: -5px; background: #ffffff; border: 2px solid #007bff; border-radius: 14px; box-shadow: 0 12px 35px rgba(0,0,0,0.25); z-index: 100; overflow: hidden; display: flex; flex-direction: column; animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
-                        
-                        <!-- 面板標題列與完成按鈕 -->
                         <div style="background: #007bff; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center;">
                             <span style="font-weight: bold; font-size: 15px;" id="sub-panel-title">小類清單</span>
                             <button type="button" onclick="closeSubPanel()" style="background: #fff; border: none; color: #007bff; font-weight: bold; padding: 6px 12px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✅ 確認完成</button>
                         </div>
-
-                        <!-- 快速全選/清空本大類按鈕 -->
                         <div style="padding: 12px 15px 0 15px; display: flex; gap: 8px;">
                             <button type="button" onclick="toggleCurrentMainCat(true)" style="flex: 1; background: #e8f5e9; color: #28a745; border: 1px solid #c3e6cb; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;">+ 全選本類</button>
                             <button type="button" onclick="toggleCurrentMainCat(false)" style="flex: 1; background: #fdeeed; color: #dc3545; border: 1px solid #f5c6cb; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;">- 清空本類</button>
                         </div>
-
-                        <!-- 由上而下的垂直小類清單 -->
-                        <div id="sub-cat-tag-cloud" style="padding: 15px; display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto;">
-                            <!-- JS 自動生成 -->
-                        </div>
+                        <div id="sub-cat-tag-cloud" style="padding: 15px; display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto;"></div>
                     </div>
                 </div>
             </div>
@@ -195,24 +184,25 @@
             <div class="header-row">
                 <button onclick="closeListView()" id="home-btn-list">⬅ 回首頁</button>
             </div>
-            <h2 style="margin-top: 10px; color: #2c3e50;">全單字列表</h2>
+            <h2>全單字列表</h2>
 
-            <div class="control-group" style="margin-top: 15px; margin-bottom: 5px;">
+            <div class="control-group">
                 <input type="text" id="search-input" placeholder="🔍 搜尋漢字、假名或中文..." autocomplete="off">
             </div>
 
-            <div class="control-group" style="margin-top: 5px; text-align: left; display: flex; gap: 8px; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 28%;">
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <div style="flex: 1;">
                     <label style="font-size: 12px; color: #666;">狀態：</label>
-                    <select id="status-filter" onchange="renderVocabList()">
-                        <option value="all">全部</option>
-                        <option value="tested">🟢 已背過</option>
-                        <option value="untested">⚪ 未測驗</option>
+                    <select id="sort-filter" onchange="renderVocabList()" style="padding: 12px; font-size: 14px;">
+                        <option value="none">全部</option>
+                        <option value="level-asc">等級：低 → 高</option>
+                        <option value="level-desc">等級：高 → 低</option>
+                        <option value="error-desc">錯率：高 → 低</option>
                     </select>
                 </div>
-                <div style="flex: 1; min-width: 28%;">
+                <div style="flex: 1;">
                     <label style="font-size: 12px; color: #666;">大類：</label>
-                    <select id="main-category-filter" onchange="updateSubCategories()">
+                    <select id="main-category-filter" onchange="updateSubCategories()" style="padding: 12px; font-size: 14px;">
                         <option value="all">全部</option>
                         <option value="名詞">名詞</option>
                         <option value="動詞">動詞</option>
@@ -222,25 +212,31 @@
                         <option value="其他">其他</option>
                     </select>
                 </div>
-                <div style="flex: 1; min-width: 28%;">
-                    <label style="font-size: 12px; color: #666;">小類：</label>
-                    <select id="pos-filter" onchange="renderVocabList()">
-                        <option value="all">全部</option>
-                    </select>
+                
+                <div style="flex: 1; position: relative;">
+                    <label style="font-size: 12px; color: #666;">小類 (多選)：</label>
+                    <button type="button" onclick="openSubSelection()" id="pos-filter-trigger" style="width:100%; padding: 12px; border-radius: 12px; border: 2px solid #e1e8ed; background: white; cursor: pointer; text-align: left; font-size: 14px; color: #333;">
+                        全部小類 ▾
+                    </button>
+
+                    <div id="pos-filter-panel" class="hidden" style="position: absolute; top: calc(100% + 5px); right: 0; width: 240px; z-index: 2000; padding: 15px; border: 2px solid #007bff; border-radius: 12px; background: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                        <div style="font-size: 12px; color: #007bff; font-weight: bold; margin-bottom: 10px;">點擊標籤進行複選：</div>
+                        <div id="pos-filter-container" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                        <button type="button" onclick="openSubSelection()" style="width: 100%; margin-top: 15px; background: #e9ecef; border: none; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: bold; color: #495057;">完成並收合</button>
+                    </div>
                 </div>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
                 <div id="vocab-count-display" style="font-size: 14px; color: #007bff; font-weight: bold;"></div>
                 <div style="display: flex; gap: 8px;">
-                    <button onclick="startPureFlashcardMode()" class="secondary-btn" style="background: #6f42c1; color: white; border: none; padding: 6px 14px; font-size: 13px;">🃏 進入小卡背誦模式</button>
-                    <button onclick="openExportModal()" class="secondary-btn" style="background: #17a2b8; color: white; border: none; padding: 6px 14px; font-size: 13px;">📥 下載 / 複製單字表</button>
+                    <button onclick="startPureFlashcardMode()" class="secondary-btn" style="background: #6f42c1; color: white; padding: 6px 14px; border:none; border-radius: 8px; font-size: 13px;">🃏 背誦</button>
+                    <button onclick="openExportModal()" class="secondary-btn" style="background: #17a2b8; color: white; padding: 6px 14px; border:none; border-radius: 8px; font-size: 13px;">📥 匯出</button>
                 </div>
             </div>
 
             <div id="vocab-list-container"></div>
         </div>
-
     </div> 
 
     <div id="word-modal" class="hidden">

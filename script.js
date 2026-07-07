@@ -1,13 +1,9 @@
 // ==========================================
 // ⭐ 1. 全域參數與 API 設定區 (請在此替換你的 Google Sheet API)
 // ==========================================
-// 根據您的 Project ID 組成的 URL
 const SUPABASE_URL = "https://jidhlyffabogaodnxash.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_UwYW-BwjlgVf5YgMYPYXvQ_-9XnRDcd"; 
 
-// 使用您上一張圖看到的 Publishable Key (sb_publishable_ 開頭那串)
-const SUPABASE_ANON_KEY = "sb_publishable_UwYW-BwjlgVf5YgMYPYXvQ_-9XnRDcd" ; 
-
-// 初始化 client
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let DAILY_LIMIT = 30;     
 const AI_BATCH_SIZE = 10; 
@@ -50,7 +46,6 @@ const vocabListContainer = document.getElementById('vocab-list-container');
 const wordModal = document.getElementById('word-modal');
 const modalContent = document.getElementById('modal-content');
 const mainCategoryFilter = document.getElementById('main-category-filter');
-const posFilter = document.getElementById('pos-filter');
 const searchInput = document.getElementById('search-input');
 
 const aiToggle = document.getElementById('ai-toggle');
@@ -355,7 +350,7 @@ function buildCategoryTree() {
     updateSelectedCountDisplay();
 }
 
-// ⭐ 點擊大類下拉選單時，彈出對應面板
+// ⭐ 點擊大類下拉選單時，彈出對應面板 (首頁用)
 window.openSubPanel = (mainCat) => {
     if (!mainCat) return;
     currentOpenMainCat = mainCat;
@@ -375,18 +370,16 @@ window.openSubPanel = (mainCat) => {
     });
 
     cloud.innerHTML = html || '<span style="color:#999; font-size:12px;">無此小類</span>';
-    panel.classList.remove('hidden'); // 跳出面板
+    panel.classList.remove('hidden'); 
 };
 
-// ⭐ 關閉彈出面板，並將下拉選單歸零
 window.closeSubPanel = () => {
     const panel = document.getElementById('right-sub-panel');
     if (panel) panel.classList.add('hidden');
     const picker = document.getElementById('main-cat-picker');
-    if (picker) picker.value = ""; // 重設讓下次可以再點選相同大類
+    if (picker) picker.value = ""; 
 };
 
-// ⭐ 點擊小類標籤，切換深色/淺色狀態與記憶庫
 window.toggleTagPill = (subCat, btnElem) => {
     if (selectedSubCats.has(subCat)) {
         selectedSubCats.delete(subCat);
@@ -398,7 +391,6 @@ window.toggleTagPill = (subCat, btnElem) => {
     updateSelectedCountDisplay();
 };
 
-// ⭐ 快速按鈕：選擇/清空「面板上」的所有小類
 window.toggleCurrentMainCat = (status) => {
     const mainCat = currentOpenMainCat;
     const subs = categoryTree[mainCat] || [];
@@ -406,25 +398,22 @@ window.toggleCurrentMainCat = (status) => {
         if (status) selectedSubCats.add(sub);
         else selectedSubCats.delete(sub);
     });
-    openSubPanel(mainCat); // 重新繪製標籤
+    openSubPanel(mainCat); 
     updateSelectedCountDisplay();
 };
 
-// ⭐ 快速按鈕：全庫全選 / 全庫清空
 window.selectAllSubCats = (status) => {
     if (status) {
         Object.values(categoryTree).flat().forEach(sub => selectedSubCats.add(sub));
     } else {
         selectedSubCats.clear();
     }
-    // 如果面板正打開著，順便重繪面板內容
     if (currentOpenMainCat && !document.getElementById('right-sub-panel').classList.contains('hidden')) {
         openSubPanel(currentOpenMainCat);
     }
     updateSelectedCountDisplay();
 };
 
-// ⭐ 更新計數小徽章與提示語
 function updateSelectedCountDisplay() {
     const display = document.getElementById('selected-sub-count');
     if (!display) return;
@@ -434,6 +423,28 @@ function updateSelectedCountDisplay() {
         display.style.background = '#f8d7da'; display.style.color = '#721c24';
     } else {
         display.style.background = '#d1ecf1'; display.style.color = '#0c5460';
+    }
+}
+
+// ⭐ 控制列表頁「全部小類 ▾」按鈕的開關 (絕對定位懸浮面板)
+window.openSubSelection = () => {
+    const panel = document.getElementById('pos-filter-panel');
+    if (panel) panel.classList.toggle('hidden');
+};
+
+// ⭐ 動態更新「全部小類 ▾」按鈕的文字與顏色
+function updateTriggerBtnText() {
+    const triggerBtn = document.getElementById('pos-filter-trigger');
+    if (!triggerBtn) return;
+    
+    if (selectedSubCats.size === 0) {
+        triggerBtn.innerText = "全部小類 ▾";
+        triggerBtn.style.color = "#333";
+        triggerBtn.style.borderColor = "#e1e8ed";
+    } else {
+        triggerBtn.innerText = `已選定 ${selectedSubCats.size} 類 ▾`;
+        triggerBtn.style.color = "#007bff";
+        triggerBtn.style.borderColor = "#007bff";
     }
 }
 
@@ -696,13 +707,29 @@ function updateStatsBar() {
 async function showListView() {
     const isLoaded = await ensureDataLoaded(viewListBtn); 
     if (!isLoaded) return;
-    mainCategoryFilter.value = 'all'; searchInput.value = ''; document.getElementById('status-filter').value = 'all'; 
+    
+    const sortFilter = document.getElementById('sort-filter');
+    if (sortFilter) {
+        sortFilter.value = 'none'; 
+    }
+    
+    mainCategoryFilter.value = 'all'; 
+    searchInput.value = ''; 
+    
     updateSubCategories(); 
-    setupSection.classList.add('hidden'); listSection.classList.remove('hidden');
+    setupSection.classList.add('hidden'); 
+    listSection.classList.remove('hidden');
 }
 
+// ⭐ 列表頁小類標籤渲染邏輯 (配合按鈕文字連動更新)
 function updateSubCategories() {
     const mainCat = mainCategoryFilter.value;
+    const container = document.getElementById('pos-filter-container');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    selectedSubCats.clear(); 
+
     const subSet = new Set();
     if (subCatMapping[mainCat]) {
         Object.keys(subCatMapping[mainCat]).forEach(key => subSet.add(key));
@@ -714,32 +741,50 @@ function updateSubCategories() {
                 else if (mainCat === '其他') {
                     const isKnown = Object.values(categoryMap).flat().some(k => p.includes(k));
                     if (!isKnown) subSet.add(p);
-                } else if (categoryMap[mainCat]?.some(k => p.includes(k))) { subSet.add(p); }
+                } else if (categoryMap[mainCat]?.some(k => p.includes(k))) { 
+                    subSet.add(p); 
+                }
             });
         });
     }
-    posFilter.innerHTML = '<option value="all">全部小類</option>';
+
     Array.from(subSet).sort().forEach(sub => {
-        const opt = document.createElement('option');
-        opt.value = sub; opt.innerText = sub;
-        posFilter.appendChild(opt);
+        const btn = document.createElement('button');
+        btn.innerText = sub;
+        btn.className = 'tag-pill';
+        btn.type = "button";
+        btn.onclick = () => {
+            if (selectedSubCats.has(sub)) {
+                selectedSubCats.delete(sub);
+                btn.classList.remove('active');
+            } else {
+                selectedSubCats.add(sub);
+                btn.classList.add('active');
+            }
+            renderVocabList(); 
+            updateTriggerBtnText(); // ⭐ 點擊標籤即時同步更新按鈕文字
+        };
+        container.appendChild(btn);
     });
+    
     renderVocabList();
+    updateTriggerBtnText(); // ⭐ 切換大類時同步重置按鈕文字
 }
 
+// ⭐ 列表篩選與渲染
 function renderVocabList() {
+    if (!vocabListContainer) return;
     vocabListContainer.innerHTML = '';
     currentFilteredWords = []; 
-    const mainCat = mainCategoryFilter.value; const subCat = posFilter.value;
-    const statusCat = document.getElementById('status-filter').value; 
+    const mainCat = mainCategoryFilter.value; 
+    
+    const sortElement = document.getElementById('sort-filter');
+    const sortType = sortElement ? sortElement.value : 'none'; 
     const searchTerm = searchInput.value.trim().toLowerCase();
-    let matchCount = 0; 
 
-    vocabData.forEach((w, index) => {
+    vocabData.forEach((w) => {
         if (!w['詞性']) return;
-        const isTested = w.drawCount > 0;
-        if (statusCat === 'tested' && !isTested) return;
-        if (statusCat === 'untested' && isTested) return;
+        
         if (searchTerm) {
             const kanji = (w['漢字'] || '').toLowerCase();
             const kana = (w['假名拼音'] || '').toLowerCase();
@@ -747,21 +792,47 @@ function renderVocabList() {
             if (!kanji.includes(searchTerm) && !kana.includes(searchTerm) && !zh.includes(searchTerm)) return; 
         }
         
-        if (!isWordMatchPOS(w, mainCat, subCat)) return;
-
-        matchCount++; 
+        if (mainCat !== 'all') {
+            if (!isWordMatchPOS(w, mainCat, 'all')) return; 
+        }
+        
+        if (selectedSubCats.size > 0) {
+            const wordPos = w['詞性'] || '';
+            const isMatch = Array.from(selectedSubCats).some(sub => wordPos.includes(sub));
+            if (!isMatch) return;
+        }
         currentFilteredWords.push(w); 
+    });
+
+    if (sortType === 'level-asc') {
+        currentFilteredWords.sort((a, b) => {
+            const valA = a.nextReviewDate ? parseInt(a.level) : -1;
+            const valB = b.nextReviewDate ? parseInt(b.level) : -1;
+            return valA - valB; 
+        });
+    } else if (sortType === 'level-desc') {
+        currentFilteredWords.sort((a, b) => {
+            const valA = a.nextReviewDate ? parseInt(a.level) : -1;
+            const valB = b.nextReviewDate ? parseInt(b.level) : -1;
+            return valB - valA; 
+        });
+    } else if (sortType === 'error-desc') {
+        currentFilteredWords.sort((a, b) => (parseFloat(b.errorRate) || 0) - (parseFloat(a.errorRate) || 0));
+    }
+
+    currentFilteredWords.forEach((w) => {
+        const originalIndex = vocabData.indexOf(w);
 
         const item = document.createElement('div');
         item.className = "list-item";
         item.style = "display:flex; align-items:center; padding:10px 5px; border-bottom:1px solid #f1f1f1; cursor:pointer;";
-        item.onclick = () => showWordDetail(index);
+        item.onclick = () => showWordDetail(originalIndex);
         
         const displayKana = w['假名拼音(分別)'] || w['假名拼音'] || "";
         const displayAccent = formatAccent(w['重音']);
         const lvLevel = w.nextReviewDate ? parseInt(w.level) : -1;
+        
         let lvText = '未測'; let lvBg = '#f8f9fa'; let lvColor = '#6c757d';
-
         if (lvLevel === 0) { lvBg = '#f8d7da'; lvColor = '#721c24'; lvText = 'Lv.0'; }
         else if (lvLevel === 1) { lvBg = '#fff3cd'; lvColor = '#856404'; lvText = 'Lv.1'; }
         else if (lvLevel === 2) { lvBg = '#cce5ff'; lvColor = '#004085'; lvText = 'Lv.2'; }
@@ -775,7 +846,7 @@ function renderVocabList() {
 
         item.innerHTML = `
             <div style="width: 45px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;">
-                <div style="font-size: 10px; color: #999; font-family: monospace; margin-bottom: 4px;">#${w['單字編號'] || (index + 1)}</div>
+                <div style="font-size: 10px; color: #999; font-family: monospace; margin-bottom: 4px;">#${w['單字編號'] || (originalIndex + 1)}</div>
                 <div style="font-size: 9px; color: ${lvColor}; background: ${lvBg}; border-radius: 4px; padding: 2px 5px; font-weight: bold;">${lvText}</div>
             </div>
             <div style="flex: 1.5; text-align: left; padding-left: 5px; min-width: 0;">
@@ -788,14 +859,14 @@ function renderVocabList() {
             </div>
             <div style="flex: 1.2; color:#d9534f; font-weight:bold; font-size:14px; text-align:left; padding-left: 5px;">${w['中文意思']}</div>
             <div style="width: 35px; text-align: right;">
-                <button onclick="event.stopPropagation(); playListAudio(${index})" style="background:none; border:none; font-size:18px; color:#007bff; cursor:pointer;">🔊</button>
+                <button onclick="event.stopPropagation(); playListAudio(${originalIndex})" style="background:none; border:none; font-size:18px; color:#007bff; cursor:pointer;">🔊</button>
             </div>
         `;
         vocabListContainer.appendChild(item);
     });
 
     const countDisplay = document.getElementById('vocab-count-display');
-    if (countDisplay) { countDisplay.innerText = `共找到 ${matchCount} 個單字`; }
+    if (countDisplay) { countDisplay.innerText = `共找到 ${currentFilteredWords.length} 個單字`; }
 }
 
 window.showWordDetail = (index) => {
@@ -818,7 +889,7 @@ window.closeModal = () => { wordModal.classList.add('hidden'); };
 
 function closeListView() { 
     listSection.classList.add('hidden'); setupSection.classList.remove('hidden'); 
-    closeSubPanel(); // 保防彈窗卡在畫面上
+    closeSubPanel(); 
 }
 
 function playListAudio(index) {
@@ -1458,7 +1529,7 @@ batchFinishBtn.onclick = () => {
     isMistakeMode = false; updateMistakeBtn(); stopAllAudio();
     quizSection.classList.add('hidden'); batchResultsArea.classList.add('hidden'); 
     setupSection.classList.remove('hidden'); 
-    closeSubPanel(); // 保證返回時不會卡著彈窗
+    closeSubPanel(); 
     refreshHomeStats(); 
 };
 
@@ -1560,7 +1631,6 @@ async function refreshHomeStats() {
             
         if (error) throw error;
         
-        // 將 word_id 轉回 wordId，確保前端邏輯運作正常
         const formattedData = data.map(item => ({
             ...item,
             wordId: item.word_id,
@@ -1660,15 +1730,14 @@ window.downloadVocabCSV = () => {
     link.setAttribute("href", url);
     
     const mainCat = mainCategoryFilter.value === 'all' ? '全部單字' : mainCategoryFilter.value;
-    const subCat = posFilter.value === 'all' ? '' : `_${posFilter.value}`;
+    const subCatStr = selectedSubCats.size > 0 ? `_已選${selectedSubCats.size}類` : '';
     const dateStr = new Date().toISOString().slice(0, 10);
-    link.setAttribute("download", `N3單字表_${mainCat}${subCat}_${dateStr}.csv`);
+    link.setAttribute("download", `N3單字表_${mainCat}${subCatStr}_${dateStr}.csv`);
     
     document.body.appendChild(link); link.click(); document.body.removeChild(link);
     closeExportModal();
 };
 
-// ⭐ 網頁載入時：立即讀取 CSV、建立樹狀結構！
 window.onload = async () => {
     refreshHomeStats();
     const savedKey = localStorage.getItem('geminiApiKey');
@@ -1691,13 +1760,12 @@ homeBtnList.onclick = () => {
     stopAllAudio(); listSection.classList.add('hidden'); setupSection.classList.remove('hidden'); closeSubPanel(); 
 };
 mainCategoryFilter.onchange = updateSubCategories;
-posFilter.onchange = renderVocabList;
 resetDataBtn.onclick = async () => {
     if (confirm("⚠️ 確定要重設所有進度嗎？")) {
         const { error } = await supabaseClient
             .from('vocab_progress')
             .delete()
-            .neq('word_id', 'non_existent_id'); // 刪除所有
+            .neq('word_id', 'non_existent_id'); 
 
         if (!error) { alert("重設成功！"); location.reload(); }
         else { alert("重設失敗: " + error.message); }

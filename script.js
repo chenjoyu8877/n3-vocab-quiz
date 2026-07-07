@@ -426,11 +426,53 @@ function updateSelectedCountDisplay() {
     }
 }
 
-// ⭐ 控制列表頁「全部小類 ▾」按鈕的開關 (絕對定位懸浮面板)
-window.openSubSelection = () => {
+// ⭐ 列表頁：小類清單面板開關與點擊外圍監聽
+window.toggleSubSelection = (event) => {
+    if (event) event.stopPropagation();
     const panel = document.getElementById('pos-filter-panel');
     if (panel) panel.classList.toggle('hidden');
 };
+
+// ⭐ 列表頁：全選或清空當前分類下的所有小類
+window.selectAllListSubCats = (status) => {
+    const mainCat = mainCategoryFilter.value;
+    const subSet = new Set();
+    
+    if (subCatMapping[mainCat]) {
+        Object.keys(subCatMapping[mainCat]).forEach(key => subSet.add(key));
+    } else {
+        vocabData.forEach(w => {
+            if (!w['詞性']) return;
+            w['詞性'].split('/').map(p => p.trim()).forEach(p => {
+                if (mainCat === 'all') subSet.add(p);
+                else if (mainCat === '其他') {
+                    const isKnown = Object.values(categoryMap).flat().some(k => p.includes(k));
+                    if (!isKnown) subSet.add(p);
+                } else if (categoryMap[mainCat]?.some(k => p.includes(k))) { 
+                    subSet.add(p); 
+                }
+            });
+        });
+    }
+
+    subSet.forEach(sub => {
+        if (status) selectedSubCats.add(sub);
+        else selectedSubCats.delete(sub);
+    });
+    
+    updateSubCategories();
+};
+
+// ⭐ 點擊選單外部自動收合監聽
+document.addEventListener('click', (event) => {
+    const dropdownArea = document.getElementById('pos-filter-dropdown-area');
+    const panel = document.getElementById('pos-filter-panel');
+    if (dropdownArea && panel && !panel.classList.contains('hidden')) {
+        if (!dropdownArea.contains(event.target)) {
+            panel.classList.add('hidden');
+        }
+    }
+});
 
 // ⭐ 動態更新「全部小類 ▾」按鈕的文字與顏色
 function updateTriggerBtnText() {

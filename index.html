@@ -213,16 +213,18 @@
                     </select>
                 </div>
                 
-                <div style="flex: 1; position: relative;">
+                <div style="flex: 1; position: relative;" id="pos-filter-dropdown-area">
                     <label style="font-size: 12px; color: #666;">小類 (多選)：</label>
-                    <button type="button" onclick="openSubSelection()" id="pos-filter-trigger" style="width:100%; padding: 12px; border-radius: 12px; border: 2px solid #e1e8ed; background: white; cursor: pointer; text-align: left; font-size: 14px; color: #333;">
+                    <button type="button" onclick="toggleSubSelection(event)" id="pos-filter-trigger" style="width:100%; padding: 12px; border-radius: 12px; border: 2px solid #e1e8ed; background: white; cursor: pointer; text-align: left; font-size: 14px; color: #333;">
                         全部小類 ▾
                     </button>
 
-                    <div id="pos-filter-panel" class="hidden" style="position: absolute; top: calc(100% + 5px); right: 0; width: 240px; z-index: 2000; padding: 15px; border: 2px solid #007bff; border-radius: 12px; background: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-                        <div style="font-size: 12px; color: #007bff; font-weight: bold; margin-bottom: 10px;">點擊標籤進行複選：</div>
-                        <div id="pos-filter-container" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
-                        <button type="button" onclick="openSubSelection()" style="width: 100%; margin-top: 15px; background: #e9ecef; border: none; padding: 8px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: bold; color: #495057;">完成並收合</button>
+                    <div id="pos-filter-panel" class="hidden" style="position: absolute; top: calc(100% + 5px); right: 0; width: 220px; z-index: 2000; background: #ffffff; border: 2px solid #007bff; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden;">
+                        <div style="background: #f8f9fa; padding: 10px; border-bottom: 1px solid #dee2e6; display: flex; gap: 6px;">
+                            <button type="button" onclick="selectAllListSubCats(true)" style="flex: 1; background: #e8f5e9; color: #28a745; border: 1px solid #c3e6cb; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">+ 全選</button>
+                            <button type="button" onclick="selectAllListSubCats(false)" style="flex: 1; background: #fdeeed; color: #dc3545; border: 1px solid #f5c6cb; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">- 清空</button>
+                        </div>
+                        <div id="pos-filter-container" style="padding: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 250px; overflow-y: auto;"></div>
                     </div>
                 </div>
             </div>

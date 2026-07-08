@@ -3,17 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>N3 單字高手 Pro - 終極自訂版</title>
+    <title>N3 單字高手 Pro - 終極自訂模組版</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
+
+    <div class="navbar">
+        <button id="drawer-toggle-btn" type="button">☰</button>
+        <span id="navbar-title">🏠 首頁 Dashboard</span>
+    </div>
+
+    <div id="drawer-overlay" class="hidden" onclick="toggleDrawer()"></div>
+    <div id="drawer-menu" class="drawer-closed">
+        <div class="drawer-header">導覽選單</div>
+        <button onclick="navigateTo('section-home')">🏠 回首頁</button>
+        <button onclick="navigateTo('section-quiz')">🎯 測驗特訓區</button>
+        <button onclick="navigateTo('section-vocab')">📖 核心單字庫</button>
+        <button onclick="navigateTo('section-weakness')">📊 弱點分析</button>
+        <button onclick="navigateTo('section-settings')">⚙️ 系統設定</button>
+    </div>
+
     <div class="container">
         
-        <div id="setup-section">
-            <h1>N3 日文單字測驗</h1>
+        <div id="section-home" class="page-view">
+            <h1 style="margin-top: 10px;">🏠 歡迎來到 N3 單字高手</h1>
+            <p style="color: #666; font-size: 14px; margin-bottom: 25px;">請選擇您今天想進行的學習模組：</p>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <button onclick="navigateTo('section-quiz')" class="primary-btn" style="margin:0; padding: 22px; font-size: 19px; background: #007bff; box-shadow: 0 6px 16px rgba(0,123,255,0.25); display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <span>🎯</span> 進入測驗區
+                </button>
+                <button onclick="navigateTo('section-vocab')" class="primary-btn" style="margin:0; padding: 22px; font-size: 19px; background: #17a2b8; box-shadow: 0 6px 16px rgba(23,162,184,0.25); display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <span>📖</span> 核心單字庫
+                </button>
+                <button onclick="navigateTo('section-weakness')" class="primary-btn" style="margin:0; padding: 22px; font-size: 19px; background: #6f42c1; box-shadow: 0 6px 16px rgba(111,66,193,0.25); display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <span>📊</span> 弱點分析與特訓
+                </button>
+            </div>
+
+            <div id="home-mistake-container" style="margin-top: 15px;"></div>
+        </div>
+
+        <div id="section-quiz" class="page-view hidden">
+            <h1>🎯 N3 分類測驗特訓區</h1>
             
             <div class="control-group">
                 <label for="qType">出題形式：</label>
@@ -27,46 +62,41 @@
                 </select>
             </div>
 
-            <div class="control-group" id="aType-container" style="background: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #e1e8ed;">
+            <div class="control-group" id="aType-container" style="background: #f8f9fa; padding: 12px; border-radius: 12px; border: 1px solid #e1e8ed; margin-bottom: 15px;"></div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 25px;">
+                <button id="start-new-words-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px; background: #20c997; box-shadow: 0 4px 12px rgba(32,201,151,0.3);">🆕 專屬：今日 30 個新單字</button>
+                <button id="start-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px;">🚀 綜合：新單字 ＋ 舊複習</button>
             </div>
 
-            <div class="control-group" style="background: #e8f4f8; padding: 14px; border-radius: 16px; border: 1px solid #bee5eb; margin-bottom: 18px;">
+            <hr style="border: 0; border-top: 2px dashed #e1e8ed; margin: 20px 0;">
+
+            <div class="control-group" style="background: #e8f4f8; padding: 16px; border-radius: 16px; border: 2px solid #bee5eb; margin-bottom: 25px;" id="quiz-pos-dropdown-area">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <label style="color: #0c5460; margin: 0; font-weight: bold; font-size: 14px;">🏷️ 測驗範圍：</label>
-                    <div style="font-size: 12px; color: #0c5460; font-weight: bold; background: #d1ecf1; padding: 2px 8px; border-radius: 10px;" id="selected-sub-count">已選定：0 個小類</div>
+                    <label style="color: #0c5460; margin: 0; font-weight: bold; font-size: 15px;">🏷️ 指定詞性／小類特訓範圍：</label>
                 </div>
-                
-                <div style="position: relative;">
-                    <select id="main-cat-picker" onchange="openSubPanel(this.value)" style="padding: 12px 10px; font-weight: bold; border-color: #007bff; border-width: 2px; color: #007bff; background: #f8f9fa; font-size: 15px;">
-                        <option value="" disabled selected>👉 點選下拉清單，展開大類 ▾</option>
-                        <option value="名詞">📁 名詞</option>
-                        <option value="動詞">📁 動詞</option>
-                        <option value="形容詞">📁 形容詞</option>
-                        <option value="副詞">📁 副詞</option>
-                        <option value="慣用">📁 慣用</option>
-                        <option value="其他">📁 其他</option>
-                    </select>
-                    
-                    <div style="margin-top: 10px; display: flex; gap: 8px;">
-                        <button type="button" onclick="selectAllSubCats(true)" class="secondary-btn" style="flex:1; padding: 8px; font-size: 13px; background: #d1ecf1; color: #0c5460; border: none; font-weight: bold;">全庫全選</button>
-                        <button type="button" onclick="selectAllSubCats(false)" class="secondary-btn" style="flex:1; padding: 8px; font-size: 13px; background: #e2e3e5; color: #383d41; border: none; font-weight: bold;">全庫清空</button>
-                    </div>
 
-                    <div id="right-sub-panel" class="hidden" style="position: absolute; top: -5px; left: -5px; right: -5px; background: #ffffff; border: 2px solid #007bff; border-radius: 14px; box-shadow: 0 12px 35px rgba(0,0,0,0.25); z-index: 100; overflow: hidden; display: flex; flex-direction: column; animation: popIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
-                        <div style="background: #007bff; color: white; padding: 12px 15px; display: flex; justify-content: space-between; align-items: center;">
-                            <span style="font-weight: bold; font-size: 15px;" id="sub-panel-title">小類清單</span>
-                            <button type="button" onclick="closeSubPanel()" style="background: #fff; border: none; color: #007bff; font-weight: bold; padding: 6px 12px; border-radius: 8px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">✅ 確認完成</button>
-                        </div>
-                        <div style="padding: 12px 15px 0 15px; display: flex; gap: 8px;">
-                            <button type="button" onclick="toggleCurrentMainCat(true)" style="flex: 1; background: #e8f5e9; color: #28a745; border: 1px solid #c3e6cb; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;">+ 全選本類</button>
-                            <button type="button" onclick="toggleCurrentMainCat(false)" style="flex: 1; background: #fdeeed; color: #dc3545; border: 1px solid #f5c6cb; padding: 8px; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer;">- 清空本類</button>
-                        </div>
-                        <div id="sub-cat-tag-cloud" style="padding: 15px; display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto;"></div>
+                <button type="button" onclick="toggleQuizPosPanel(event)" id="pos-trigger-quiz" class="unified-dropdown" style="padding-right: 30px; background: white;">
+                    <span id="pos-trigger-text-quiz" style="pointer-events: none;">全部詞性</span>
+                </button>
+
+                <div id="pos-panel-quiz" class="hidden" style="position: absolute; top: calc(100% - 10px); left: 16px; right: 16px; z-index: 2000; background: #ffffff; border: 1px solid #ccc; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); display: flex; height: 300px; overflow: hidden;">
+                    <div style="width: 100px; background: #f8f9fa; border-right: 1px solid #eee; display: flex; flex-direction: column; overflow-y: auto;" id="main-cat-list-quiz"></div>
+                    <div style="flex: 1; display: flex; flex-direction: column; background: #fff;" id="sub-cat-area-quiz">
+                        <button type="button" id="toggle-all-quiz-btn" onclick="toggleQuizSubCats(event)" class="custom-menu-item" style="border-bottom: 2px solid #eee; justify-content: center; color: #555; background: #fafafa;">
+                            ☑️ 全選此類
+                        </button>
+                        <div id="pos-container-quiz" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;"></div>
                     </div>
                 </div>
+
+                <button id="start-pos-btn" class="primary-btn" style="margin-top: 15px; padding: 16px; font-size: 17px; background: #17a2b8; box-shadow: 0 4px 12px rgba(23,162,184,0.3); width: 100%;">🎯 啟動：指定詞性／小類特訓</button>
             </div>
 
-            <div class="advanced-settings">
+            <hr style="border: 0; border-top: 2px dashed #e1e8ed; margin: 20px 0;">
+
+            <div class="advanced-settings" style="border: none; padding-top: 0; margin-top: 0; background: #f8f9fa; padding: 15px; border-radius: 16px; border: 1px solid #e1e8ed;">
+                <div style="font-size: 13px; color: #666; font-weight: bold; margin-bottom: 12px;">⚙️ 測驗引擎進階設定：</div>
                 <div class="toggle-group" style="margin-bottom: 5px;">
                     <label class="switch">
                         <input type="checkbox" id="srs-toggle" checked>
@@ -83,35 +113,91 @@
                     </label>
                     <span style="color: #007bff; font-weight: bold;">開啟 Gemini AI 語意批改</span>
                 </div>
-                <div id="ai-settings" class="hidden" style="margin-bottom: 15px;">
+                <div id="ai-settings" class="hidden" style="margin-bottom: 5px; margin-top: 10px;">
                     <p style="font-size: 12px; color: #666; margin-bottom: 5px;">⚠️ 啟用後將強制進行測驗，結束後統一交由 AI 對答案(需包含中文作答)。</p>
                     <input type="password" id="gemini-api-key" placeholder="請輸入 Gemini API Key..." autocomplete="off">
                 </div>
-                
-                <div class="stats-container">
-                    <h3 style="font-size: 16px; margin-bottom: 10px; color: #444;">📊 弱點分析 (最常錯單字)</h3>
-                    <canvas id="errorChart" width="400" height="250"></canvas>
-                </div>
+            </div>
 
-                <button id="view-list-btn" class="secondary-btn" style="background-color: #28a745; width: 100%; margin-bottom: 10px; color: white; border: none;">📖 瀏覽單字表</button>
+            <button id="view-list-btn" class="secondary-btn" style="background-color: #28a745; width: 100%; color: white; border: none; display: none;">📖 瀏覽單字表</button>
+        </div>
+
+        <div id="section-vocab" class="page-view hidden">
+            <h2>📖 全單字列表檢視</h2>
+
+            <div class="control-group">
+                <input type="text" id="search-input" placeholder="🔍 搜尋漢字、假名或中文..." autocomplete="off">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 12px; color: #666;">狀態：</label>
+                    <select id="sort-filter" onchange="renderVocabList()" class="unified-dropdown">
+                        <option value="none">全部</option>
+                        <option value="level-asc">等級：低 → 高</option>
+                        <option value="level-desc">等級：高 → 低</option>
+                        <option value="error-desc">錯率：高 → 低</option>
+                        <option value="error-asc">錯率：低 → 高</option>
+                    </select>
+                </div>
                 
-                <details style="margin-top: 15px; text-align: center; border-top: 1px solid #eee; padding-top: 15px;">
-                    <summary style="color: #dc3545; font-size: 13px; font-weight: bold; cursor: pointer; outline: none;">⚠️ 展開危險操作區 (重設進度)</summary>
-                    <button id="reset-data-btn" class="danger-btn">Sweep 🧹 重設所有單字進度 (歸零)</button>
-                </details>
+                <div style="flex: 1; position: relative;" id="pos-filter-dropdown-area">
+                    <label style="font-size: 12px; color: #666;">詞性過濾：</label>
+                    <button type="button" onclick="toggleSubSelection(event)" id="pos-filter-trigger" class="unified-dropdown" style="padding-right: 30px;">
+                        <span id="pos-filter-trigger-text" style="pointer-events: none;">全部詞性</span>
+                    </button>
+
+                    <div id="pos-filter-panel" class="hidden" style="position: absolute; top: calc(100% + 5px); right: 0; width: 320px; max-width: 90vw; z-index: 2000; background: #ffffff; border: 1px solid #ccc; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.15); display: flex; height: 300px; overflow: hidden;">
+                        <div style="width: 100px; background: #f8f9fa; border-right: 1px solid #eee; display: flex; flex-direction: column; overflow-y: auto;" id="main-cat-list"></div>
+                        <div style="flex: 1; display: flex; flex-direction: column; background: #fff;" id="sub-cat-area">
+                            <button type="button" id="toggle-all-list-btn" onclick="toggleCurrentSubCats(event)" class="custom-menu-item" style="border-bottom: 2px solid #eee; justify-content: center; color: #555; background: #fafafa;">
+                                ☑️ 全選此類
+                            </button>
+                            <div id="pos-filter-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+                <div id="vocab-count-display" style="font-size: 14px; color: #007bff; font-weight: bold;"></div>
+                <div style="display: flex; gap: 8px;">
+                    <button onclick="startPureFlashcardMode()" class="secondary-btn" style="background: #6f42c1; color: white; padding: 6px 14px; border:none; border-radius: 8px; font-size: 13px;">🃏 背誦</button>
+                    <button onclick="openExportModal()" class="secondary-btn" style="background: #17a2b8; color: white; padding: 6px 14px; border:none; border-radius: 8px; font-size: 13px;">📥 匯出</button>
+                </div>
+            </div>
+
+            <div id="vocab-list-container"></div>
+        </div>
+
+        <div id="section-weakness" class="page-view hidden">
+            <h1 style="margin-top: 10px;">📊 弱點分析與錯題特訓</h1>
+            <p style="color: #666; font-size: 13px; text-align: left; margin-bottom: 15px; line-height: 1.5;">系統會自動追蹤您在所有測驗中的答錯次數與錯誤率，幫您精準抓出最容易忘記的「死穴單字」。</p>
+            
+            <div class="stats-container" style="margin-top: 0;">
+                <h3 style="font-size: 16px; margin-bottom: 10px; color: #444;">🎯 歷史弱點 (最常錯單字 Top 5)</h3>
+                <canvas id="errorChart" width="400" height="250"></canvas>
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
-                <button id="start-new-words-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px; background: #20c997; box-shadow: 0 4px 12px rgba(32,201,151,0.3);">🆕 專屬：今日 30 個新單字</button>
-                <button id="start-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px;">🚀 綜合：新單字 ＋ 舊複習</button>
-                <button id="start-pos-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px; background: #17a2b8; box-shadow: 0 4px 12px rgba(23,162,184,0.3);">🎯 專屬：指定詞性／小類特訓</button>
-                <button id="start-frequent-mistakes-btn" class="primary-btn" style="margin: 0; background: #6c757d; box-shadow: 0 4px 12px rgba(108,117,125,0.3);">💀 常錯單字死穴特訓</button>
+                <button id="start-frequent-mistakes-btn" class="primary-btn" style="margin: 0; padding: 18px; font-size: 18px; background: #6c757d; box-shadow: 0 4px 12px rgba(108,117,125,0.3);">💀 常錯單字死穴特訓</button>
+            </div>
+        </div>
+
+        <div id="section-settings" class="page-view hidden">
+            <h2>⚙️ 系統進度進階設定</h2>
+            <p style="font-size:14px; color:#555; text-align:left; line-height:1.6;">在這裡您可以管理您的雲端同步儲存進度。請注意，刪除操作為不可逆之危險操作。</p>
+            
+            <div style="background:#fff; border:1px solid #eee; border-radius:16px; padding:20px; text-align:left; margin-top:20px;">
+                <h3 style="color:#dc3545; margin-top:0; font-size:16px;">⚠️ 危險操作區</h3>
+                <p style="font-size:13px; color:#666; margin-bottom:15px;">重設將會清除您在雲端資料庫（Supabase）上的所有單字熟悉度等級、答題次數以及錯誤率分析，使所有單字返回「未測驗」狀態。</p>
+                <button id="reset-data-btn" class="danger-btn" style="margin-top:0;">Sweep 🧹 重設所有單字進度 (歸零)</button>
             </div>
         </div>
 
         <div id="quiz-section" class="hidden">
             <div class="header-row">
-                <button id="home-btn">⬅ 回首頁 / 列表</button>
+                <button id="home-btn">⬅ 返回上一頁 (結束測驗)</button>
             </div>
             
             <div id="question-area">
@@ -177,68 +263,9 @@
         <div id="batch-results-area" class="hidden">
             <h2 style="color: #2c3e50; margin-bottom: 10px;">📊 測驗結算 (AI 批改)</h2>
             <div id="batch-results-content" style="text-align: left; margin-bottom: 15px;"></div>
-            <button id="batch-finish-btn" class="primary-btn">完成並回首頁</button>
+            <button id="batch-finish-btn" class="primary-btn">完成並回上一頁</button>
         </div>
 
-        <div id="list-section" class="hidden">
-            <div class="header-row">
-                <button onclick="closeListView()" id="home-btn-list">⬅ 回首頁</button>
-            </div>
-            <h2>全單字列表</h2>
-
-            <div class="control-group">
-                <input type="text" id="search-input" placeholder="🔍 搜尋漢字、假名或中文..." autocomplete="off">
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <div style="flex: 1;">
-                    <label style="font-size: 12px; color: #666;">狀態：</label>
-                    <select id="sort-filter" onchange="renderVocabList()" style="padding: 12px; font-size: 14px;">
-                        <option value="none">全部</option>
-                        <option value="level-asc">等級：低 → 高</option>
-                        <option value="level-desc">等級：高 → 低</option>
-                        <option value="error-desc">錯率：高 → 低</option>
-                    </select>
-                </div>
-                <div style="flex: 1;">
-                    <label style="font-size: 12px; color: #666;">大類：</label>
-                    <select id="main-category-filter" onchange="updateSubCategories()" style="padding: 12px; font-size: 14px;">
-                        <option value="all">全部</option>
-                        <option value="名詞">名詞</option>
-                        <option value="動詞">動詞</option>
-                        <option value="形容詞">形容詞</option>
-                        <option value="副詞">副詞</option> 
-                        <option value="慣用">慣用</option>
-                        <option value="其他">其他</option>
-                    </select>
-                </div>
-                
-                <div style="flex: 1; position: relative;" id="pos-filter-dropdown-area">
-                    <label style="font-size: 12px; color: #666;">小類 (多選)：</label>
-                    <button type="button" onclick="toggleSubSelection(event)" id="pos-filter-trigger" style="width:100%; padding: 12px; border-radius: 12px; border: 2px solid #e1e8ed; background: white; cursor: pointer; text-align: left; font-size: 14px; color: #333;">
-                        全部小類 ▾
-                    </button>
-
-                    <div id="pos-filter-panel" class="hidden" style="position: absolute; top: calc(100% + 5px); right: 0; width: 220px; z-index: 2000; background: #ffffff; border: 2px solid #007bff; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); overflow: hidden;">
-                        <div style="background: #f8f9fa; padding: 10px; border-bottom: 1px solid #dee2e6; display: flex; gap: 6px;">
-                            <button type="button" onclick="selectAllListSubCats(true)" style="flex: 1; background: #e8f5e9; color: #28a745; border: 1px solid #c3e6cb; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">+ 全選</button>
-                            <button type="button" onclick="selectAllListSubCats(false)" style="flex: 1; background: #fdeeed; color: #dc3545; border: 1px solid #f5c6cb; padding: 6px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer;">- 清空</button>
-                        </div>
-                        <div id="pos-filter-container" style="padding: 10px; display: flex; flex-direction: column; gap: 6px; max-height: 250px; overflow-y: auto;"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-                <div id="vocab-count-display" style="font-size: 14px; color: #007bff; font-weight: bold;"></div>
-                <div style="display: flex; gap: 8px;">
-                    <button onclick="startPureFlashcardMode()" class="secondary-btn" style="background: #6f42c1; color: white; padding: 6px 14px; border:none; border-radius: 8px; font-size: 13px;">🃏 背誦</button>
-                    <button onclick="openExportModal()" class="secondary-btn" style="background: #17a2b8; color: white; padding: 6px 14px; border:none; border-radius: 8px; font-size: 13px;">📥 匯出</button>
-                </div>
-            </div>
-
-            <div id="vocab-list-container"></div>
-        </div>
     </div> 
 
     <div id="word-modal" class="hidden">
@@ -253,7 +280,7 @@
             <p style="color: #555; margin-bottom: 25px;">本輪單字已全數消滅！<br>你要重新挑戰這一輪，還是結束任務？</p>
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <button onclick="restartRound()" class="primary-btn" style="margin:0;">🔄 重新進行這一輪 (不限次數)</button>
-                <button onclick="document.getElementById('home-btn').click(); document.getElementById('round-modal').classList.add('hidden');" class="secondary-btn">🏠 結束並回首頁</button>
+                <button onclick="document.getElementById('home-btn').click(); document.getElementById('round-modal').classList.add('hidden');" class="secondary-btn">🏠 結束回前頁</button>
             </div>
         </div>
     </div>

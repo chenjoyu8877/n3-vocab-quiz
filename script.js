@@ -137,7 +137,7 @@ window.closeDrawer = () => {
     document.getElementById('drawer-menu').classList.add('drawer-closed');
 };
 
-window.navigateTo = (sectionId) => {
+window.navigateTo = async (sectionId) => {
     document.querySelectorAll('.page-view, #quiz-section, #batch-results-area').forEach(el => el.classList.add('hidden'));
     document.getElementById(sectionId).classList.remove('hidden');
     closeDrawer();
@@ -156,6 +156,7 @@ window.navigateTo = (sectionId) => {
     }
 
     if (sectionId === 'section-vocab') {
+        await ensureDataLoaded(); 
         renderMainCatTabs();
         renderSubCatPanel();
         renderVocabList();
@@ -516,6 +517,15 @@ function updateTriggerBtnText() {
     }
 }
 
+// ⭐ 新增：單字列表頁 取消所有選取
+window.clearAllListSubCats = (e) => {
+    if (e) e.stopPropagation();
+    selectedSubCats.clear();
+    renderSubCatPanel();
+    renderVocabList();
+    updateTriggerBtnText();
+};
+
 // --- B. 測驗特訓區專屬的詞性選單 ---
 window.toggleQuizPosPanel = (event) => {
     if (event) event.stopPropagation();
@@ -612,6 +622,14 @@ function updateQuizTriggerText() {
     text.style.fontWeight = selectedSubCatsQuiz.size === 0 ? "normal" : "bold";
 }
 
+// ⭐ 新增：測驗特訓區 取消所有選取
+window.clearAllQuizSubCats = (e) => {
+    if (e) e.stopPropagation();
+    selectedSubCatsQuiz.clear();
+    renderQuizSubPanel();
+    updateQuizTriggerText();
+};
+
 // ⭐ 全域點擊監聽：點擊空白處自動收起所有展開面板
 document.addEventListener('click', (event) => {
     const posArea = document.getElementById('pos-filter-dropdown-area');
@@ -692,13 +710,17 @@ function initDailyPool() {
     dailyPool = [...dailyNewWords, ...dueOldWords];
 }
 
-async function ensureDataLoaded(btnElement) {
+async function ensureDataLoaded(btnElement = null) {
     const currentStudyDate = getTodayStudyString();
     if (vocabData.length > 0 && lastSyncStudyDate === currentStudyDate) {
         initDailyPool(); return true; 
     }
-    const originalText = btnElement.innerText;
-    btnElement.innerText = "連線同步中..."; btnElement.disabled = true; 
+    let originalText = "";
+    if (btnElement) {
+        originalText = btnElement.innerText;
+        btnElement.innerText = "連線同步中..."; 
+        btnElement.disabled = true; 
+    }
     try {
         if (vocabData.length === 0) {
             await loadVocabCSV();
@@ -729,7 +751,10 @@ async function ensureDataLoaded(btnElement) {
     } catch (err) {
         console.error("同步發生例外錯誤:", err); return false;
     } finally {
-        btnElement.innerText = originalText; btnElement.disabled = false;
+        if (btnElement) {
+            btnElement.innerText = originalText; 
+            btnElement.disabled = false;
+        }
     }
 }
 
@@ -1659,12 +1684,16 @@ async function refreshHomeStats() {
 }
 
 window.undo = () => {
-    currentWord.errorCount--; currentWord.level += 2; 
+    if (currentWord.errorCount > 0) currentWord.errorCount--; 
+    if (currentWord.drawCount > 0) currentWord.drawCount--; 
+    
+    currentWord.level++; 
+    
     updateLocalNextReviewDate(currentWord, "UNDO");
     roundPending.push(currentWord);
     currentWord.errorRate = currentWord.drawCount > 0 ? (currentWord.errorCount / currentWord.drawCount) : 0;
     syncToCloud("UNDO", currentWord);
-    feedback.innerHTML = `<h3 style="color:blue;">✨ 已取消懲罰！</h3>` + (feedback.innerHTML.split('</button>')[1] || "");
+    feedback.innerHTML = `<h3 style="color:blue;">✨ 已取消懲罰並恢復進度！</h3>` + (feedback.innerHTML.split('</button>')[1] || "");
 };
 
 function syncToCloud(op, wordObj) {
@@ -1746,12 +1775,13 @@ window.onload = async () => {
     }
     renderATypeOptions(); 
 
-    refreshHomeStats();
     if (vocabData.length === 0) {
         await loadVocabCSV();
     }
-    buildCategoryTree();
+    await ensureDataLoaded();
     
+    refreshHomeStats();
+    buildCategoryTree();
     renderMainCatTabs(); 
     renderSubCatPanel(); 
 };

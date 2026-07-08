@@ -1171,8 +1171,12 @@ function nextQuestion() {
         else if (currentActiveQType === 'flashcard') currentActiveATypes = ['漢字', '假名拼音', '中文意思'];
     } else if (currentActiveQType !== 'flashcard') {
         currentActiveATypes = Array.from(document.querySelectorAll('input[name="atype-chk"]:checked')).map(el => el.value);
+        
+        // ⭐ 新增邏輯：如果漢字與假名相同，自動移除漢字檢測
+        if (currentActiveATypes.includes('漢字') && currentWord['漢字'] === currentWord['假名拼音']) {
+            currentActiveATypes = currentActiveATypes.filter(t => t !== '漢字');
+        }
     }
-
     if (currentActiveQType === 'flashcard') {
         document.getElementById('question-area').classList.add('hidden');
         inputArea.classList.add('hidden'); canvasArea.classList.add('hidden');

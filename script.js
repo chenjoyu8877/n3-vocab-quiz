@@ -687,19 +687,28 @@ function initDailyPool() {
 
     let savedDate = localStorage.getItem('dailyNewDate');
     let savedIds = JSON.parse(localStorage.getItem('dailyNewIds') || '[]');
-    if (savedDate !== todayStr) { savedIds = []; }
-
-    dailyNewWords = vocabData.filter(w => savedIds.includes(w.uniqueId));
-    if (dailyNewWords.length < DAILY_LIMIT) {
-        let needed = DAILY_LIMIT - dailyNewWords.length;
-        let availableNew = vocabData.filter(w => w.drawCount === 0 && !savedIds.includes(w.uniqueId));
-        let toAdd = availableNew.slice(0, needed);
-        dailyNewWords = [...dailyNewWords, ...toAdd];
+    
+    // 如果日期變了，重置並進行隨機抽取
+    if (savedDate !== todayStr) {
+        // 1. 篩選所有完全沒學過的單字 (drawCount === 0)
+        let unlearnedWords = vocabData.filter(w => w.drawCount === 0);
+        
+        // 2. 隨機打亂這些未學習單字
+        unlearnedWords.sort(() => Math.random() - 0.5);
+        
+        // 3. 取出隨機的 30 個
+        dailyNewWords = unlearnedWords.slice(0, DAILY_LIMIT);
+        
+        // 4. 保存這 30 個 ID
         savedIds = dailyNewWords.map(w => w.uniqueId);
         localStorage.setItem('dailyNewIds', JSON.stringify(savedIds));
         localStorage.setItem('dailyNewDate', todayStr);
+    } else {
+        // 如果是同一天，讀取之前鎖定的那 30 個
+        dailyNewWords = vocabData.filter(w => savedIds.includes(w.uniqueId));
     }
 
+    // 舊字複習邏輯維持不變
     dueOldWords = vocabData.filter(w => {
         if (w.drawCount === 0 || savedIds.includes(w.uniqueId) || !w.nextReviewDate) return false; 
         const nd = new Date(w.nextReviewDate);

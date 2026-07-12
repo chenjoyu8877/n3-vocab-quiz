@@ -93,4 +93,4 @@ async def generate_audio():
         print(f"❌ 嚴重錯誤: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(generate_audio())
+    asyncio.run(generate_audio())    
